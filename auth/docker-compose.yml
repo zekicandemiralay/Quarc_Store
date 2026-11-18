@@ -1,0 +1,36 @@
+services:
+  quarc-auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quarc-auth
+    volumes:
+      # The volume is named after this folder ("auth" → auth_auth_data), so
+      # running this from Quarc_Store/auth reuses the exact same data volume
+      # the original v1 deployment created. No migration needed.
+      - auth_data:/app/data
+      # Nightly backups land in Quarc_Store/backups/nightly_YYYY-MM-DD/ on the
+      # host (next to the Store's own store.db backup of the same night).
+      - ../backups:/app/backups
+    environment:
+      - PORT=3002
+      - DB_PATH=/app/data/auth.db
+      - JWT_SECRET=${JWT_SECRET:-insecure-default-change-in-production}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - SECURE_COOKIE=${SECURE_COOKIE:-true}
+      - SESSION_LIFETIME_DAYS=${SESSION_LIFETIME_DAYS:-365}
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+      - BACKUP_DIR=/app/backups
+      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-14}
+      - BACKUP_HOUR_UTC=${BACKUP_HOUR_UTC:-2}
+    restart: unless-stopped
+    networks:
+      - quarcnet-shared
+
+networks:
+  quarcnet-shared:
+    external: true
+
+volumes:
+  auth_data:

@@ -1,0 +1,111 @@
+name: Android Release
+
+# Push a tag like v1.0.0 to build a signed Quarc Store APK and publish it as a
+# GitHub release. The Store lists itself in its own catalog, so every
+# installed Store sees the new version and can update itself.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build frontend for Android (bundled, points to server)
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://quarcnet0.tail84500c.ts.net:4006
+        run: npm run build
+
+      - name: Copy frontend build into Capacitor web dir
+        run: cp -r frontend/dist/* mobile/www/
+
+      - name: Install Capacitor dependencies
+        working-directory: mobile
+        run: npm install
+
+      - name: Sync Capacitor
+        working-directory: mobile
+        run: npx cap sync android
+
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: mobile/android
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          # MAJOR*10000 + MINOR*100 + PATCH, so versionCode always grows
+          # (needs MINOR and PATCH to stay under 100).
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$TAG"
+          CODE=$((MAJOR * 10000 + MINOR * 100 + ${PATCH:-0}))
+          sed -i "s/versionCode [0-9]*/versionCode $CODE/" app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$TAG\"/" app/build.gradle
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > mobile/android/app/release.keystore
+
+      - name: Verify keystore, alias and password
+        working-directory: mobile/android/app
+        run: |
+          if [ ! -s release.keystore ]; then echo "::error::KEYSTORE_BASE64 secret is missing or empty"; exit 1; fi
+          keytool -list -keystore release.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" -alias quarc-store \
+            || { echo "::error::Keystore could not be opened: wrong KEYSTORE_PASSWORD, bad KEYSTORE_BASE64, or no key with alias quarc-store"; exit 1; }
+
+      - name: Build signed release APK
+        working-directory: mobile/android
+        env:
+          KEYSTORE_PATH: release.keystore
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: quarc-store
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: chmod +x gradlew && ./gradlew assembleRelease
+
+      - name: Publish release with APK
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const tag = context.ref.startsWith('refs/tags/') ? context.ref.replace('refs/tags/', '') : `manual-${Date.now()}`;
+            const body = [
+              '## Installation',
+              '',
+              '**Android:** download `Quarc-Store-Android.apk`, allow your browser/file manager to install apps, and open it.',
+              'Already have Quarc Store? It will offer this update by itself.',
+              '',
+              'Tailscale must be connected — see README_Users.md.',
+            ].join('\n');
+            const { data: release } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Quarc Store ${tag}`,
+              body,
+              draft: false,
+              prerelease: !context.ref.startsWith('refs/tags/'),
+            });
+            await github.rest.repos.uploadReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              name: 'Quarc-Store-Android.apk',
+              data: fs.readFileSync('mobile/android/app/build/outputs/apk/release/app-release.apk'),
+            });

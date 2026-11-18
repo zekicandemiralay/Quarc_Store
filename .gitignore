@@ -1,0 +1,15 @@
+.env
+.claude/
+node_modules/
+auth/data/
+backend/data/
+frontend/dist/
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/*.keystore
+mobile/android/app/release.keystore
+backup_*/
+backups/
+mobile/keystore-password.txt

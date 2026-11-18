@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Seeing which Quarc apps are installed (and their versions). The
+         explicit list covers today's apps; QUERY_ALL_PACKAGES covers apps
+         added to the catalog later without a Store update. -->
+    <queries>
+        <package android:name="com.quarc.music" />
+        <package android:name="com.quarc.notes" />
+        <package android:name="com.quarc.weather" />
+        <package android:name="com.quarc.translate" />
+        <package android:name="com.quarc.calendar" />
+    </queries>
+
+    <!-- allowBackup=false: the device's Quarc login lives in this app's
+         private storage and must not travel to cloud backups or other phones. -->
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- quarcstore://login?return=<pkg>, quarcstore://app/<pkg>, quarcstore://updates -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="quarcstore" />
+            </intent-filter>
+        </activity>
+
+        <!-- Single sign-on for other Quarc apps. Exported on purpose: every
+             call is checked against the caller's signing certificate (see
+             CallerVerifier), since each Quarc app has its own signing key and
+             a signature-level permission can't be shared between them. -->
+        <provider android:name=".SsoProvider" android:authorities="com.quarc.store.sso" android:exported="true" />
+
+        <receiver android:name=".InstallResultReceiver" android:exported="false" />
+    </application>
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Android 12+: lets updates of apps the Store installed go through without a prompt. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+</manifest>

@@ -1,0 +1,30 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: quarc-auth — sessions, Store single sign-on, admin
+        working-directory: auth
+        run: npm install && npm test
+
+      - name: Store backend — GitHub sync, APK fingerprints, admin rules
+        working-directory: backend
+        env:
+          # Shared runners would otherwise hit GitHub's anonymous API limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm install && npm test
+
+      - name: Frontend — translations complete, builds
+        working-directory: frontend
+        run: npm install && npm run i18n:check && npm run build

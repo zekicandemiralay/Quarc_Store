@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification icon: Android renders it as a white silhouette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,7 L8,6 A4,4 0 0,1 16,6 L16,7 L19,7 L18,21 L6,21 L5,7 Z M10,7 L14,7 L14,6 A2,2 0 0,0 10,6 Z" />
+</vector>

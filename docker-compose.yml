@@ -1,0 +1,58 @@
+# Quarc Store — catalog backend + web/nginx front end on :4006.
+# The shared login service lives in ./auth and runs as its own compose
+# project (see auth/README.md); this file only connects to it.
+#
+# Service names are deliberately NOT "backend"/"frontend": these containers
+# join the shared quarcnet-shared network, where every other Quarc app's
+# nginx resolves the name "backend" to its own backend. A Store service called
+# "backend" there could capture their traffic.
+services:
+  store-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - store_data:/app/data
+      # Nightly backups, next to quarc-auth's (see auth/docker-compose.yml).
+      - ./backups:/app/backups
+    environment:
+      - PORT=3007
+      - DB_PATH=/app/data/store.db
+      - BACKUP_DIR=/app/backups
+      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-14}
+      - BACKUP_HOUR_UTC=${BACKUP_HOUR_UTC:-2}
+      # Admin requests are checked live against the shared login service.
+      - AUTH_URL=http://quarc-auth:3002
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_OWNER=${GITHUB_OWNER:-zekicandemiralay}
+      - PUBLIC_HOST=${PUBLIC_HOST:-https://quarcnet0.tail84500c.ts.net}
+      - SYNC_INTERVAL_MINUTES=${SYNC_INTERVAL_MINUTES:-15}
+    restart: unless-stopped
+    networks:
+      - app-network
+      - quarcnet-shared
+
+  store-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "4006:443"
+    volumes:
+      - /var/lib/tailscale/certs:/etc/nginx/ssl:ro
+    depends_on:
+      - store-backend
+    restart: unless-stopped
+    networks:
+      - app-network
+      # Lets nginx reach the quarc-auth container by name for /api/auth/*.
+      - quarcnet-shared
+
+networks:
+  app-network:
+    driver: bridge
+  quarcnet-shared:
+    external: true
+
+volumes:
+  store_data:

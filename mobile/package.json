@@ -1,0 +1,19 @@
+{
+  "name": "quarc-store-android",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npx cap sync android",
+    "open": "npx cap open android",
+    "icons": "npx capacitor-assets generate --android --iconBackgroundColor \"#ffffff\" --iconBackgroundColorDark \"#ffffff\" --splashBackgroundColor \"#09090b\" --splashBackgroundColorDark \"#09090b\""
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/core": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/assets": "^3.0.5"
+  }
+}

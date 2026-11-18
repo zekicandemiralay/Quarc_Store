@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Quarc Store</string>
+    <string name="title_activity_main">Quarc Store</string>
+    <string name="package_name">com.quarc.store</string>
+    <string name="custom_url_scheme">quarcstore</string>
+    <string name="channel_updates">App updates</string>
+    <string name="channel_updates_desc">New versions of your Quarc apps</string>
+</resources>

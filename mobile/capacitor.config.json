@@ -1,0 +1,9 @@
+{
+  "appId": "com.quarc.store",
+  "appName": "Quarc Store",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#09090b"
+  }
+}
