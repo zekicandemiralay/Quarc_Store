@@ -157,7 +157,7 @@ router.get('/users/search', requireAuth, (req, res) => {
     .prepare(
       `SELECT id, username FROM users
        WHERE username LIKE ? ESCAPE '\\' AND id != ?
-       ORDER BY username COLLATE NOCASE LIMIT 20`
+       ORDER BY username COLLATE NOCASE LIMIT 10`
     )
     .all(like, req.user.id);
   res.json(users);

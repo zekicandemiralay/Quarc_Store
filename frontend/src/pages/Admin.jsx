@@ -81,7 +81,7 @@ function Users() {
 
   const load = useCallback(() => {
     api('/api/auth/admin/users')
-      .then((r) => setUsers(Array.isArray(r) ? r : []))
+      .then((r) => setUsers(Array.isArray(r) ? [...r].sort((a, b) => a.username.localeCompare(b.username)) : []))
       .catch((err) => {
         setUsers([]);
         toast(err.message, { tone: 'error' });

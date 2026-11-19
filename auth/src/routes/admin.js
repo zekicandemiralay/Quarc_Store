@@ -27,7 +27,7 @@ router.get('/users', (_req, res) => {
       `SELECT u.id, u.username, u.role, u.created_at,
               (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL) AS sessions,
               (SELECT MAX(last_seen_at) FROM sessions s WHERE s.user_id = u.id) AS lastSeenAt
-       FROM users u ORDER BY u.username COLLATE NOCASE`
+       FROM users u ORDER BY u.created_at`
     )
     .all();
   res.json(users);
