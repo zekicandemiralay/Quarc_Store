@@ -40,14 +40,21 @@ function shapeRelease(row, { withAssets = true } = {}) {
   return out;
 }
 
-function certsFor(app, latestRow) {
+/**
+ * Signing fingerprints trusted for this app: those of all its known release
+ * APKs (not just the newest — a brand-new release's fingerprint is computed
+ * a little after the release itself shows up, and without the earlier ones
+ * the app would briefly have none, so devices refreshing in that window
+ * would refuse it single sign-on), plus any the admin added.
+ */
+function certsFor(app) {
   const set = new Set();
-  if (latestRow) {
-    const apk = JSON.parse(latestRow.assets_json || '[]').find((a) => a.platform === 'android');
-    if (apk) {
-      const row = getDb().prepare('SELECT sha256 FROM apk_certs WHERE asset_url = ?').get(apk.url);
-      if (row?.sha256) set.add(row.sha256);
-    }
+  const db = getDb();
+  const lookup = db.prepare('SELECT sha256 FROM apk_certs WHERE asset_url = ? AND sha256 IS NOT NULL');
+  for (const { assets_json } of db.prepare('SELECT assets_json FROM releases WHERE app_id = ?').all(app.id)) {
+    const apk = JSON.parse(assets_json || '[]').find((a) => a.platform === 'android');
+    const row = apk && lookup.get(apk.url);
+    if (row) set.add(row.sha256);
   }
   for (const fp of String(app.cert_sha256 || '').split(/[,\s]+/)) {
     const n = normalizeFingerprint(fp);
@@ -85,7 +92,7 @@ function shapeApp(app, { releaseLimit = 10, admin = false } = {}) {
     platforms: FAMILY_ORDER.filter((f) => families.has(f)),
     latest,
     releases: rows.map((r) => shapeRelease(r, { withAssets: false })),
-    certSha256: app.package_name ? certsFor(app, latestRow) : [],
+    certSha256: app.package_name ? certsFor(app) : [],
   };
   if (admin) {
     const state = db.prepare('SELECT * FROM sync_state WHERE app_id = ?').get(app.id) || {};

@@ -157,22 +157,51 @@ async function computeMissingCerts() {
 let running = null;
 
 /** Syncs every app (sequentially, to be gentle on GitHub). Coalesces concurrent calls. */
+let releasesDone = Promise.resolve(); // settles when the current run's release data is fresh
+let lastStartedAt = 0;
+
 function syncAll() {
   if (running) return running;
+  lastStartedAt = Date.now();
+  let markReleasesDone;
+  releasesDone = new Promise((resolve) => {
+    markReleasesDone = resolve;
+  });
   running = (async () => {
-    const apps = getDb().prepare('SELECT id, repo FROM apps WHERE repo IS NOT NULL AND repo != ?').all('');
-    for (const app of apps) {
-      try {
-        await syncApp(app);
-      } catch (err) {
-        console.warn(`[sync] ${app.id}: ${err.message}`);
+    try {
+      const apps = getDb().prepare('SELECT id, repo FROM apps WHERE repo IS NOT NULL AND repo != ?').all('');
+      for (const app of apps) {
+        try {
+          await syncApp(app);
+        } catch (err) {
+          console.warn(`[sync] ${app.id}: ${err.message}`);
+        }
       }
+    } finally {
+      markReleasesDone();
     }
+    // Slower (downloads APKs) — nobody needs to wait for it.
     await computeMissingCerts();
   })().finally(() => {
     running = null;
   });
   return running;
+}
+
+/**
+ * For someone asking "is there anything new?" (opening the Store, "Check
+ * now"): if GitHub hasn't been asked in the last maxAgeMs, ask now and wait
+ * until the release data is fresh — at most timeoutMs, then answer with what
+ * we have while the check finishes in the background. Throttled, so many
+ * devices opening the Store at once cost at most one GitHub round per
+ * maxAgeMs (and unchanged repos answer 304, which GitHub doesn't count).
+ */
+async function refreshIfStale({ maxAgeMs = 2 * 60 * 1000, timeoutMs = 10000 } = {}) {
+  if (!running && Date.now() - lastStartedAt < maxAgeMs) return;
+  if (!running) syncAll().catch(() => {});
+  let timer;
+  await Promise.race([releasesDone, new Promise((resolve) => (timer = setTimeout(resolve, timeoutMs)))]);
+  clearTimeout(timer);
 }
 
 function startSyncLoop() {
@@ -181,4 +210,4 @@ function startSyncLoop() {
   console.log(`Release sync every ${SYNC_MINUTES} min${GITHUB_TOKEN ? ' (authenticated)' : ''}.`);
 }
 
-module.exports = { syncAll, syncApp, computeMissingCerts, startSyncLoop, classifyAsset, compareVersions, versionFromTag };
+module.exports = { syncAll, syncApp, refreshIfStale, computeMissingCerts, startSyncLoop, classifyAsset, compareVersions, versionFromTag };

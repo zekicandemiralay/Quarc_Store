@@ -46,6 +46,14 @@ authStub.listen(0, async () => {
       assert.ok(r.json.apps.every((a) => a.packageName), 'every listed app is an Android app');
       ok(`seeded catalog (Android apps only): ${ids.join(', ')}`);
 
+      // Opening the catalog asks GitHub itself when the last check is stale —
+      // the very first request had never synced, so it must carry releases.
+      assert.ok(r.json.apps.find((a) => a.id === 'music').latest, 'first catalog request fetched releases from GitHub');
+      const t0 = Date.now();
+      await get('/api/store/catalog');
+      assert.ok(Date.now() - t0 < 1500, 'a second request within 2 minutes does not re-check GitHub');
+      ok('opening the Store / "Check now" fetches new releases on demand (throttled to once per 2 min)');
+
       // Real GitHub sync for Quarc Music
       await syncApp({ id: 'music', repo: 'zekicandemiralay/Quarc_Music' });
       r = await get('/api/store/apps/music');
@@ -59,6 +67,19 @@ authStub.listen(0, async () => {
       assert.equal(r.json.certSha256.length, 1, 'fingerprint computed');
       assert.match(r.json.certSha256[0], /^[0-9a-f]{64}$/);
       ok(`computed Quarc Music's signing fingerprint from its APK: ${r.json.certSha256[0].slice(0, 16)}…`);
+
+      // A brand-new release shows up before its APK's fingerprint is computed:
+      // the app must keep its known fingerprint meanwhile (else SSO breaks).
+      const known = r.json.certSha256[0];
+      const { getDb } = require('../src/db');
+      getDb()
+        .prepare('INSERT INTO releases (app_id, tag, version, name, body, published_at, html_url, assets_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run('music', 'v9.9.9', '9.9.9', 'v9.9.9', '', new Date().toISOString(), 'https://example.com', JSON.stringify([{ name: 'x.apk', url: 'https://example.com/new.apk', size: 1, platform: 'android' }]));
+      r = await get('/api/store/apps/music');
+      assert.equal(r.json.latest.version, '9.9.9');
+      assert.deepEqual(r.json.certSha256, [known]);
+      getDb().prepare("DELETE FROM releases WHERE app_id = 'music' AND tag = 'v9.9.9'").run();
+      ok("a new release doesn't drop the app's trusted fingerprint while its own is being computed");
 
       // Admin
       r = await send('POST', '/api/store/admin/apps', { id: 'x', name: 'X' });

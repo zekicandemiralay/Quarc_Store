@@ -5,10 +5,19 @@
 const express = require('express');
 const router = express.Router();
 const { buildCatalog, getApp, getRequirements } = require('../services/catalog');
+const { refreshIfStale } = require('../services/github');
 
-router.get('/catalog', (_req, res) => {
-  res.set('Cache-Control', 'no-cache');
-  res.json(buildCatalog());
+// Opening the Store or tapping "Check now" lands here: make sure a release
+// published a minute ago shows up, instead of waiting for the next
+// scheduled sync (every SYNC_INTERVAL_MINUTES).
+router.get('/catalog', async (_req, res, next) => {
+  try {
+    await refreshIfStale();
+    res.set('Cache-Control', 'no-cache');
+    res.json(buildCatalog());
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.get('/apps/:id', (req, res) => {
@@ -18,7 +27,8 @@ router.get('/apps/:id', (req, res) => {
 });
 
 // Called by each Quarc app on launch (Android and desktop): "is my version
-// still allowed?" — see sso-kit/web/RequiredUpdateGate.jsx.
+// still allowed?" — see sso-kit/web/RequiredUpdateGate.jsx. Deliberately
+// never triggers a GitHub check: every app calls it on every launch.
 router.get('/packages/:packageName', (req, res) => {
   const reqs = getRequirements(req.params.packageName);
   if (!reqs) return res.status(404).json({ error: 'Unknown app' });
