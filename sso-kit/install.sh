@@ -37,3 +37,4 @@ grep -q "QuarcSsoPlugin" "$JAVA_DIR/MainActivity.java" || echo "  TODO: register
 grep -q "com.quarc.store" "$APP/mobile/android/app/src/main/AndroidManifest.xml" || echo "  TODO: <queries><package android:name=\"com.quarc.store\" /></queries> in AndroidManifest.xml"
 grep -q "syncFromStore" "$APP/frontend/src/store/authStore.js" || echo "  TODO: hook syncFromStore/watchStoreSession into authStore.js"
 grep -q "RequiredUpdateGate" "$APP/frontend/src/main.jsx" || echo "  TODO: <RequiredUpdateGate packageName=\"$PKG\" /> next to <App /> in main.jsx"
+grep -q "<StorePromo dialog" "$APP/frontend/src/main.jsx" || echo "  TODO: <StorePromo dialog /> next to <App /> in main.jsx"

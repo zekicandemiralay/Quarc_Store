@@ -20,9 +20,10 @@ Copies (re-run any time to refresh them):
 - `web/StoreLoginButton.jsx` → `frontend/src/components/StoreLoginButton.jsx`
   (Android: "Continue as …"; web/desktop: "Sign in with your phone")
 - `web/RequiredUpdateGate.jsx` → `frontend/src/components/RequiredUpdateGate.jsx`
-- `web/StorePromo.jsx` → `frontend/src/components/StorePromo.jsx` — "Get Quarc Store" for
-  the app's update info. Place `<StorePromo compact />` in the "update available" strip and
-  `<StorePromo />` in the update section of Settings. It shows only on Android, only when the
+- `web/StorePromo.jsx` → `frontend/src/components/StorePromo.jsx` — "Get Quarc Store".
+  Mount `<StorePromo dialog />` next to `<App />` (a one-time card after each update, once per
+  version), place `<StorePromo compact />` in the "update available" strip and `<StorePromo />` in
+  the update section of Settings. It shows only on Android, only when the
   Store isn't installed, and only while the app's version is below its entry in
   `STORE_PROMO_UNTIL` (`web/storeSso.js`) — add a new app there with "first release + 10".
 
