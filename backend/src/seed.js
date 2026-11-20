@@ -76,9 +76,9 @@ const DEFAULT_APPS = [
   {
     id: 'sport',
     name: 'Quarc Sport',
-    tagline: 'Your Garmin activities and health',
+    tagline: 'Your sport and health data, in one place',
     description:
-      'Runs, rides and walks on a map, personal bests and training load, plus heart rate, sleep, steps and body battery, synced from Garmin Connect.',
+      'Runs, rides and walks on a map, personal bests and training load, plus heart rate, sleep and steps, from Garmin Connect, Strava or your phone\'s Health Connect.',
     repo: `${OWNER}/Quarc_Sport`,
     package_name: 'com.quarc.sport',
     web_url: `${HOST}:4007`,
