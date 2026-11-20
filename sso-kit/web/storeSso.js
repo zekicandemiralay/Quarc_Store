@@ -77,6 +77,7 @@ const STORE_PROMO_UNTIL = {
   'com.quarc.weather': '1.0.19', //   1.0.9  – 1.0.18
   'com.quarc.translate': '1.0.12', // 1.0.2  – 1.0.11
   'com.quarc.calendar': '1.0.12', //  1.0.2  – 1.0.11
+  'com.quarc.sport': '1.0.10', //     1.0.0  – 1.0.9  (Quarc Sport)
 };
 
 /** Android app, Quarc Store not installed, and still within the promo releases? */

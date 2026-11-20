@@ -1,6 +1,7 @@
-// The catalog Quarc Store starts with. Inserted once, on first start; after
-// that the admin edits it in the Store (Admin → Catalog) and this file is
-// never consulted again — deleting an app there won't bring it back.
+// The catalog Quarc Store starts with. Each entry is inserted once — on first
+// start, or on the first start after it was added to this list (so a new app
+// reaches existing servers too). After that the admin edits it in the Store
+// (Admin → Catalog); deleting an app there won't bring it back.
 //
 // The Store lists Android apps only (every entry needs a package name).
 
@@ -73,6 +74,19 @@ const DEFAULT_APPS = [
     sort_order: 50,
   },
   {
+    id: 'sport',
+    name: 'Quarc Sport',
+    tagline: 'Your Garmin activities and health',
+    description:
+      'Runs, rides and walks on a map, personal bests and training load, plus heart rate, sleep, steps and body battery, synced from Garmin Connect.',
+    repo: `${OWNER}/Quarc_Sport`,
+    package_name: 'com.quarc.sport',
+    web_url: `${HOST}:4007`,
+    icon_url: `${HOST}:4007/logo.png`,
+    accent: '#84cc16',
+    sort_order: 60,
+  },
+  {
     id: 'store',
     name: 'Quarc Store',
     tagline: 'Every Quarc app, one login',
@@ -94,18 +108,29 @@ function isBlocked({ id, repo, package_name, name } = {}) {
   return [id, repo, package_name, name].some((v) => typeof v === 'string' && /cleaning/i.test(v));
 }
 
+// What servers seeded before the per-app record ('seeded_ids') existed.
+const FIRST_SEED = ['music', 'notes', 'calendar', 'weather', 'translate', 'store'];
+
 function seed() {
-  if (getMeta('seeded')) return;
   const db = getDb();
+  // Ids ever seeded here, so an app the admin deleted is never re-added.
+  const stored = getMeta('seeded_ids');
+  const done = new Set(stored ? JSON.parse(stored) : getMeta('seeded') ? FIRST_SEED : []);
+  const fresh = DEFAULT_APPS.filter((app) => !done.has(app.id));
+  if (!fresh.length) return;
+  // An app the admin already added by hand (same id or package name) wins.
   const insert = db.prepare(`
     INSERT OR IGNORE INTO apps (id, name, tagline, description, repo, package_name, web_url, icon_url, accent, sso, sort_order)
     VALUES (@id, @name, @tagline, @description, @repo, @package_name, @web_url, @icon_url, @accent, @sso, @sort_order)
   `);
+  const listed = db.prepare('SELECT 1 FROM apps WHERE package_name = ?');
   db.transaction(() => {
-    for (const app of DEFAULT_APPS) insert.run({ sso: 1, ...app });
+    for (const app of fresh) if (!listed.get(app.package_name)) insert.run({ sso: 1, ...app });
+    for (const app of fresh) done.add(app.id);
+    setMeta('seeded_ids', JSON.stringify([...done]));
+    if (!getMeta('seeded')) setMeta('seeded', new Date().toISOString());
   })();
-  setMeta('seeded', new Date().toISOString());
-  console.log(`Seeded catalog with ${DEFAULT_APPS.length} apps.`);
+  console.log(`Catalog: added ${fresh.map((a) => a.name).join(', ')}.`);
 }
 
 module.exports = { seed, isBlocked, DEFAULT_APPS };

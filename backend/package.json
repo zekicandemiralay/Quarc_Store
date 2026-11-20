@@ -4,7 +4,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "test": "node test/catalog.test.js",
+    "test": "node test/seed.test.js && node test/catalog.test.js",
     "apk-cert": "node scripts/apk-cert.js"
   },
   "dependencies": {

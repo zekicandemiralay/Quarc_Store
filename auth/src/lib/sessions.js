@@ -32,6 +32,7 @@ const DEFAULT_APP_PORTS = {
   4003: 'Quarc Translate',
   4005: 'Quarc Calendar',
   4006: 'Quarc Store',
+  4007: 'Quarc Sport',
 };
 
 function appPorts() {
