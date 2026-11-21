@@ -111,7 +111,37 @@ function isBlocked({ id, repo, package_name, name } = {}) {
 // What servers seeded before the per-app record ('seeded_ids') existed.
 const FIRST_SEED = ['music', 'notes', 'calendar', 'weather', 'translate', 'store'];
 
+// Default texts this file used to seed. When a listed app still carries one of
+// them word for word, nobody edited it in Admin, so it gets today's default text
+// on the next start. Anything the admin wrote is left alone.
+const PREVIOUS_TEXTS = {
+  sport: {
+    tagline: ['Your Garmin activities and health'],
+    description: [
+      'Runs, rides and walks on a map, personal bests and training load, plus heart rate, sleep, steps and body battery, synced from Garmin Connect.',
+    ],
+  },
+};
+
+function refreshDefaultTexts() {
+  const db = getDb();
+  let changed = 0;
+  for (const [id, fields] of Object.entries(PREVIOUS_TEXTS)) {
+    const app = DEFAULT_APPS.find((a) => a.id === id);
+    if (!app) continue;
+    for (const [field, old] of Object.entries(fields)) {
+      if (!['tagline', 'description'].includes(field) || !old.length) continue;
+      const marks = old.map(() => '?').join(', ');
+      changed += db
+        .prepare(`UPDATE apps SET ${field} = ?, updated_at = datetime('now') WHERE id = ? AND ${field} IN (${marks})`)
+        .run(app[field], id, ...old).changes;
+    }
+  }
+  if (changed) console.log(`Catalog: refreshed ${changed} default text(s).`);
+}
+
 function seed() {
+  refreshDefaultTexts();
   const db = getDb();
   // Ids ever seeded here, so an app the admin deleted is never re-added.
   const stored = getMeta('seeded_ids');

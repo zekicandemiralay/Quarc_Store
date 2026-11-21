@@ -50,6 +50,23 @@ try {
   assert.ok(JSON.parse(getMeta('seeded_ids')).includes('sport'));
   ok('an app the admin already added by hand (same package) is not duplicated');
 
+  // Sport listed with the text 1.0 seeded: it gets today's text; an admin's own text stays.
+  const sportDefault = DEFAULT_APPS.find((a) => a.id === 'sport');
+  db.prepare("DELETE FROM apps WHERE id = 'garmin'").run();
+  insert.run({ ...sportDefault, sort_order: 60 });
+  db.prepare("UPDATE apps SET tagline = 'Your Garmin activities and health', description = ? WHERE id = 'sport'").run(
+    'Runs, rides and walks on a map, personal bests and training load, plus heart rate, sleep, steps and body battery, synced from Garmin Connect.'
+  );
+  seed();
+  let texts = db.prepare("SELECT tagline, description FROM apps WHERE id = 'sport'").get();
+  assert.equal(texts.tagline, sportDefault.tagline);
+  assert.equal(texts.description, sportDefault.description);
+  db.prepare("UPDATE apps SET tagline = 'Written by the admin' WHERE id = 'sport'").run();
+  seed();
+  texts = db.prepare("SELECT tagline FROM apps WHERE id = 'sport'").get();
+  assert.equal(texts.tagline, 'Written by the admin');
+  ok("an untouched old default text is refreshed on start; the admin's own text is kept");
+
   console.log('\nAll seed tests passed.');
   process.exit(0);
 } catch (err) {
