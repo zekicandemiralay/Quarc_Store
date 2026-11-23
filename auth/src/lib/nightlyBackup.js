@@ -38,8 +38,8 @@ function safeList(dir) {
   }
 }
 
-function prune(dir, fileName, keepDays) {
-  const cutoff = Date.parse(utcDate(Date.now() - keepDays * DAY_MS));
+function prune(dir, fileName, keepDays, now = Date.now()) {
+  const cutoff = Date.parse(utcDate(now - keepDays * DAY_MS));
   for (const name of safeList(dir)) {
     const m = name.match(FOLDER_RE);
     if (!m || Date.parse(m[1]) >= cutoff) continue;
@@ -65,7 +65,7 @@ async function runOnce(getDb, fileName, { dir, keepDays, hourUtc, now = Date.now
     fs.renameSync(tmp, target); // never leave a half-written file under the real name
     written = target;
   }
-  prune(dir, fileName, keepDays);
+  prune(dir, fileName, keepDays, now);
   return written;
 }
 
