@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MonitorSmartphone } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import { api } from '../lib/api';
-import { isNative } from '../lib/native';
+import { isAndroid } from '../lib/native';
 import { toast } from '../store/toastStore';
 import Modal from './Modal';
 
@@ -20,7 +20,7 @@ export default function ApprovalWatcher() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!isNative() || !user) return undefined;
+    if (!isAndroid() || !user) return undefined;
     let stopped = false;
     let timer;
     const tick = async () => {

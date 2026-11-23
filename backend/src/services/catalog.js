@@ -16,6 +16,8 @@ const PLATFORM_FAMILY = {
 };
 const FAMILY_ORDER = ['android', 'windows', 'macos', 'linux', 'web'];
 
+const isSetupExe = (name) => /-setup.exe$/i.test(name);
+
 function shapeRelease(row, { withAssets = true } = {}) {
   const assets = JSON.parse(row.assets_json || '[]');
   const out = {
@@ -33,6 +35,9 @@ function shapeRelease(row, { withAssets = true } = {}) {
       const item = { name: a.name, url: a.url, size: a.size };
       if (a.platform === 'other') other.push(item);
       else if (!byPlatform[a.platform]) byPlatform[a.platform] = item;
+      // A release has both a -setup.exe and an .msi; the Windows Store installs the .exe
+      // (silently, no admin prompt), so it must be the one listed whatever order GitHub returns.
+      else if (a.platform === 'windows' && isSetupExe(a.name) && !isSetupExe(byPlatform.windows.name)) byPlatform.windows = item;
     }
     out.assets = byPlatform;
     out.otherAssets = other;
@@ -160,4 +165,4 @@ function getApp(id, { admin = false } = {}) {
   return shapeApp(app, { releaseLimit: 30, admin });
 }
 
-module.exports = { buildCatalog, getApp, getRequirements };
+module.exports = { buildCatalog, getApp, getRequirements, shapeRelease };

@@ -63,7 +63,34 @@ Sometimes an old version of an app stops working with the server. Then the Store
 its update **Required**, and the app itself shows an "Update required" screen — tap
 **Update**.
 
-## Web, Windows, macOS, Linux, iPhone
+## Windows
+
+### Install Quarc Store
+
+1. Open the [latest release](https://github.com/zekicandemiralay/Quarc_Store/releases/latest) and
+   download **Quarc.Store_…_x64-setup.exe**.
+2. Run it. Windows may say "Windows protected your PC" because the Quarc apps aren't signed with
+   a paid certificate: choose **More info → Run anyway**. It installs for you only, with no
+   administrator prompt.
+
+Sign in with your Quarc username and password, or with **Sign in with your phone**.
+
+### Install and update apps
+
+- **Apps** tab: every Quarc app. Press **Install**, **Update** or **Open**. The Store downloads the
+  app's installer and runs it for you, so there is nothing to click through.
+- **Updates** tab: everything with a new version, with **Update all**. If the app is open, its
+  installer closes it first — save your work. The Store looks for new releases whenever you come
+  back to its window, and every 30 minutes while it's open.
+- **Uninstall** (on an app's page) removes the app but keeps its data.
+- The Store updates itself the same way: press **Update** on Quarc Store and it restarts.
+
+### What's different from Android
+
+Each Quarc desktop app keeps its own login — the Store doesn't sign them in. (You can still use
+**Sign in with your phone** in each app.) There are no background update notifications.
+
+## Web, macOS, Linux, iPhone
 
 Open **https://quarcnet0.tail84500c.ts.net:4006** in a browser: the same list of apps,
 with downloads for every platform and your account settings. In a browser, signing in to
@@ -82,6 +109,7 @@ signed in. If a request pops up that you didn't start, tap **Deny**.
 |---|---|
 | An app still shows its login screen | Make sure the app is updated (single sign-on needs a recent version), then switch away from it and back |
 | "Sign in with Quarc Store" does nothing | Update Quarc Store |
+| Windows: "Install failed" | Check Tailscale and that GitHub is reachable, then try again. |
 | Install stuck on "Confirm…" | Look for Android's install dialog, or pull down the notification shade |
 | "Couldn't load the app list" | Check that Tailscale is connected |
 | Phone sign-in: nothing appears on the phone | Open Quarc Store on the phone (it checks while it's open) and make sure it's signed in to the same account |

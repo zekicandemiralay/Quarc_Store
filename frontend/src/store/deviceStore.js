@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { storeNative, removeListener } from '../lib/native';
+import { storeNative, removeListener, platformAsset } from '../lib/native';
 import { compareVersions } from '../lib/format';
 
-// What's installed on this Android device, and installs in progress.
+// What's installed on this device (Android or Windows), and installs in progress.
 // Every method is a harmless no-op on the web.
 
 // Resolvers for install() promises, settled by native installProgress events.
@@ -74,10 +74,10 @@ const useDeviceStore = create((set, get) => ({
     storeNative()?.openInstallSettings().catch(() => {});
   },
 
-  /** Installs or updates an app. Resolves when Android reports the outcome. */
+  /** Installs or updates an app. Resolves when the device reports the outcome. */
   async install(app) {
     const native = storeNative();
-    const asset = app.latest?.assets?.android;
+    const asset = platformAsset(app.latest);
     if (!native || !asset || !app.packageName) return { phase: 'failed', message: 'Not installable here' };
     if (!(await get().checkInstallPermission())) return { phase: 'needs-permission' };
 
@@ -123,12 +123,14 @@ const useDeviceStore = create((set, get) => ({
     }
   },
 
-  /** Updates apps one after another, so Android's confirmations don't pile up. */
+  /** Updates apps one after another (Android's confirmations would pile up; Windows runs one installer at a time). */
   async updateAll(apps) {
     if (get().queueRunning) return;
     set({ queueRunning: true });
     try {
-      for (const app of apps) {
+      // The Store replaces itself last: once it does, it restarts and the rest of the queue is gone.
+      const self = (a) => a.packageName === 'com.quarc.store';
+      for (const app of [...apps].sort((a, b) => self(a) - self(b))) {
         const r = await get().install(app);
         if (r.phase === 'needs-permission') break;
       }
@@ -138,7 +140,12 @@ const useDeviceStore = create((set, get) => ({
   },
 
   uninstall(app) {
-    storeNative()?.uninstall({ packageName: app.packageName }).catch(() => {});
+    // Android hands over to the system's remove dialog and comes back through a resume;
+    // Windows removes the app itself and settles when it is gone. Either way, look again after.
+    storeNative()
+      ?.uninstall({ packageName: app.packageName })
+      .then(() => get().refresh())
+      .catch(() => get().refresh());
   },
 
   launch(app) {
@@ -153,7 +160,7 @@ const useDeviceStore = create((set, get) => ({
 export function appStatus(app, info, task) {
   if (!app.packageName) return app.webUrl ? 'web' : 'none';
   if (task && !FINAL.has(task.phase)) return 'busy';
-  const apk = app.latest?.assets?.android;
+  const apk = platformAsset(app.latest);
   if (!info?.installed) return apk ? 'install' : app.webUrl ? 'web' : 'none';
   if (apk && compareVersions(app.latest.version, info.versionName) > 0) return 'update';
   return 'open';

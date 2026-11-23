@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Quarc Store",
+  "version": "1.1.0",
+  "identifier": "com.quarc.store",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "frontendDist": "../../frontend/dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Quarc",
+    "shortDescription": "Install and update every Quarc app",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Quarc Store",
+        "width": 1000,
+        "height": 760,
+        "minWidth": 420,
+        "minHeight": 560,
+        "resizable": true,
+        "fullscreen": false,
+        "useHttpsScheme": true,
+        "backgroundColor": "#09090b"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://quarcnet0.tail84500c.ts.net:*; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost https://quarcnet0.tail84500c.ts.net:4006; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'"
+    }
+  }
+}

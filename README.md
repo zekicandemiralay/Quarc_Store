@@ -13,6 +13,9 @@ One place to get every Quarc app — and one login for all of them.
 - **Optional by design**: every app keeps its own login screen and works without the
   Store, on Android and on every other platform. When the Store *is* installed, it is the
   primary source: its login wins.
+- **Windows app**: the same Store on a PC. Install, update, open and remove the Quarc
+  desktop apps from one list (each app's own Windows installer, run silently). Each desktop
+  app keeps its own login there — single sign-on is an Android feature.
 - **Web version** at `https://quarcnet0.tail84500c.ts.net:4006` — the same catalog with
   downloads for every platform the apps ship on, and your account settings.
 - **Android apps only**: the catalog lists apps that have an Android build (Music, Notes,
@@ -23,8 +26,9 @@ One place to get every Quarc app — and one login for all of them.
 Quarc_Store/
 ├── auth/       quarc-auth — the shared login service for the whole suite
 ├── backend/    catalog service — mirrors each app's GitHub releases, computes APK signing fingerprints
-├── frontend/   the Store UI (web + bundled into the Android app)
+├── frontend/   the Store UI (web + bundled into the Android and Windows apps)
 ├── mobile/     the Android app (Capacitor) — installer, update worker, single sign-on provider
+├── desktop/    the Windows app (Tauri) — installs, updates, opens and removes the Quarc desktop apps
 └── sso-kit/    the small piece every Quarc app carries to receive the Store's login
 ```
 
@@ -112,9 +116,11 @@ server migration (see `../MIGRATION.md`).
 
 ---
 
-## Part 2 — Releasing the Android app
+## Part 2 — Releasing the Android and Windows apps
 
-Same flow as your other apps: push a tag, GitHub Actions builds and signs the APK.
+Same flow as your other apps: push a tag, GitHub Actions builds and signs the APK and builds
+the Windows installer (`Quarc.Store_<version>_x64-setup.exe`, see `desktop/BUILD.md`), and
+publishes both in one release.
 
 **One-time setup** (needs a JDK — Android Studio's bundled `jbr/bin/keytool` works):
 
@@ -138,7 +144,7 @@ it, regenerate the Android launcher icons and splash screens with `cd mobile && 
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
-The Store lists itself in its own catalog, so installed Stores pick up new versions.
+The Store lists itself in its own catalog, so installed Stores (Android and Windows) pick up new versions.
 
 **The other apps** need one new release each to carry the single sign-on piece (already
 added in their working trees — see "What changed in the other apps" below). Until an app
@@ -147,6 +153,37 @@ is updated, it simply keeps using its own login.
 ---
 
 ## Part 3 — How it works
+
+### The Windows app
+
+The window shows the same pages as the Android app, bundled into the program (built with
+`VITE_API_URL` pointing at the server, so it works like the Android build: cross-site cookies, the
+server already allows any origin with credentials). What Android does with its native plugin,
+Windows does with a few Rust commands (`desktop/src-tauri/src/`), behind the same interface
+(`frontend/src/lib/native.js` → `storeNative()`), so the buttons, progress and Updates tab are
+the same code:
+
+- **What's installed**: Windows' own list of installed programs. Each Quarc installer registers
+  `HKCU...Uninstall<product name>` with publisher `Quarc`, its version, folder and main program,
+  so `com.quarc.music` is matched by `quarc-music.exe` / `Quarc Music`. No list of its own to go stale.
+- **Install / update**: downloads the release's `-setup.exe` (the catalog lists that one, not the
+  `.msi`), then runs it with `/S`. The installers install for the current user, so there is no
+  administrator prompt. A running app is closed by its installer.
+- **Open / remove**: starts the app from its install folder; removes it with its own `uninstall.exe /S`
+  (the app's data is kept). The Store can't remove itself.
+- **Updating the Store**: Windows can't overwrite a running program, so a small helper runs the
+  installer after the Store has quit and starts the new Store.
+- **What it will run**: only `https://github.com/<owner>/Quarc_<App>/releases/download/<tag>/*-setup.exe`
+  for the app being installed, redirected only to GitHub's own hosts, and only if the file is a
+  Windows program of the size GitHub announced. Everything else is refused (`rules.rs`, unit-tested).
+  The window loads no web pages from anywhere, and its content-security policy allows the Store's
+  server only. If the GitHub owner ever changes, change `OWNER` in `rules.rs` too.
+- **Sign-in**: password or "Sign in with your phone". The session is labelled
+  `quarc-store-windows`, **not** `quarc-store`, so a PC can neither sign in other apps nor approve
+  other computers' sign-ins; only the phone's Store can.
+- **Not on Windows**: single sign-on across apps, background update checks and notifications. The
+  Store looks for new releases when its window is focused (at most every 5 minutes) and every 30
+  minutes while open; the Updates tab shows a badge.
 
 ### Single sign-on on Android
 

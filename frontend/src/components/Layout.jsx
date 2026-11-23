@@ -4,7 +4,7 @@ import { LayoutGrid, RefreshCw, UserRound, Shield, ShieldCheck } from 'lucide-re
 import useAuthStore from '../store/authStore';
 import useCatalogStore from '../store/catalogStore';
 import useDeviceStore, { useUpdatable } from '../store/deviceStore';
-import { isNative } from '../lib/native';
+import { isAndroid } from '../lib/native';
 
 function Tab({ to, icon: Icon, label, badge }) {
   return (
@@ -81,7 +81,7 @@ export default function Layout() {
         </div>
       </header>
 
-      {isNative() && <InstallPermissionBanner />}
+      {isAndroid() && <InstallPermissionBanner />}
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-28 pt-4 md:pb-10">
         <Outlet />

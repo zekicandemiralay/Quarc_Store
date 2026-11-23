@@ -5,7 +5,7 @@ import { ArrowLeft, KeyRound, Github, Globe, Trash2, Download, ChevronDown } fro
 import useCatalogStore from '../store/catalogStore';
 import useDeviceStore, { useAppStatus, isRequired } from '../store/deviceStore';
 import { api } from '../lib/api';
-import { isNative, openExternal } from '../lib/native';
+import { isDesktop, isNative, openExternal, platformAsset } from '../lib/native';
 import { formatBytes, formatDate } from '../lib/format';
 import AppIcon from '../components/AppIcon';
 import AppActionButton from '../components/AppActionButton';
@@ -100,7 +100,9 @@ export default function AppDetail() {
   }
 
   const latest = app.latest;
-  const androidAsset = latest?.assets?.android;
+  const installAsset = platformAsset(latest);
+  // The Windows Store can update itself, but not remove itself.
+  const isSelfOnDesktop = isDesktop() && app.packageName === 'com.quarc.store';
 
   return (
     <div className="space-y-5">
@@ -119,7 +121,7 @@ export default function AppDetail() {
 
       <div className="flex flex-wrap items-center gap-2">
         <AppActionButton app={app} />
-        {native && info?.installed && (
+        {native && info?.installed && !isSelfOnDesktop && (
           <button className="btn-ghost" onClick={() => uninstall(app)}>
             <Trash2 size={14} /> {t('action.uninstall', 'Uninstall')}
           </button>
@@ -136,7 +138,7 @@ export default function AppDetail() {
           [t('detail.latest', 'Latest'), latest ? `v${latest.version}` : '—'],
           native && app.packageName ? [t('detail.installed', 'Installed'), info?.installed ? `v${info.versionName}` : t('detail.notInstalled', 'No')] : null,
           [t('detail.released', 'Released'), latest ? formatDate(latest.publishedAt, i18n.language) : '—'],
-          androidAsset ? [t('detail.size', 'Size'), formatBytes(androidAsset.size)] : null,
+          installAsset ? [t('detail.size', 'Size'), formatBytes(installAsset.size)] : null,
         ]
           .filter(Boolean)
           .map(([k, v]) => (
@@ -156,7 +158,7 @@ export default function AppDetail() {
         </div>
       )}
 
-      {app.sso && (
+      {app.sso && !isDesktop() && (
         <div className="flex gap-2.5 rounded-xl border border-accent/30 bg-accent-soft p-3 text-sm text-emerald-200">
           <KeyRound size={18} className="mt-0.5 shrink-0 text-accent" />
           <p>{t('detail.sso', 'Uses your Quarc account. When you are signed in to Quarc Store on this phone, this app signs you in automatically.')}</p>

@@ -1,8 +1,9 @@
-name: Android Release
+name: Release
 
-# Push a tag like v1.0.0 to build a signed Quarc Store APK and publish it as a
-# GitHub release. The Store lists itself in its own catalog, so every
-# installed Store sees the new version and can update itself.
+# Push a tag like v1.1.0 to build the signed Quarc Store APK (Android) and the
+# Windows installer, and publish both as one GitHub release. The Store lists
+# itself in its own catalog, so every installed Store (Android and Windows)
+# sees the new version and can update itself.
 
 on:
   push:
@@ -11,7 +12,96 @@ on:
   workflow_dispatch:
 
 jobs:
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    outputs:
+      release_id: ${{ steps.create.outputs.result }}
+    steps:
+      - name: Create draft release
+        id: create
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const isTag = context.ref.startsWith('refs/tags/');
+            const tag = isTag ? context.ref.replace('refs/tags/', '') : `manual-${Date.now()}`;
+            const body = [
+              '## Installation',
+              '',
+              '| Platform | File |',
+              '|----------|------|',
+              '| Android  | `Quarc-Store-Android.apk` |',
+              '| Windows  | `Quarc.Store_*_x64-setup.exe` |',
+              '',
+              '**Android:** download the APK, allow your browser/file manager to install apps, and open it.',
+              '**Windows:** run the installer. If Windows says "protected your PC", choose More info → Run anyway (the Quarc apps are not signed with a paid certificate).',
+              'Already have Quarc Store? It will offer this update by itself.',
+              '',
+              'Tailscale must be connected — see README_Users.md.',
+            ].join('\n');
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Quarc Store ${tag}`,
+              body,
+              draft: true,
+              prerelease: !isTag,
+            });
+            return data.id;
+
+  build-windows:
+    needs: create-release
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build the Store pages (bundled into the app, pointing at the server)
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://quarcnet0.tail84500c.ts.net:4006
+        run: npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install
+
+      - name: Set desktop version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: desktop/src-tauri
+        shell: bash
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          node -e "const fs=require('fs'),c=JSON.parse(fs.readFileSync('tauri.conf.json','utf8'));c.version='${TAG}';fs.writeFileSync('tauri.conf.json',JSON.stringify(c,null,2)+'\n')"
+
+      - name: Build and upload the installer
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+
   build-android:
+    needs: create-release
     permissions:
       contents: write
     runs-on: ubuntu-22.04
@@ -79,33 +169,36 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: chmod +x gradlew && ./gradlew assembleRelease
 
-      - name: Publish release with APK
+      - name: Upload the APK to the release
         uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
         with:
           script: |
             const fs = require('fs');
-            const tag = context.ref.startsWith('refs/tags/') ? context.ref.replace('refs/tags/', '') : `manual-${Date.now()}`;
-            const body = [
-              '## Installation',
-              '',
-              '**Android:** download `Quarc-Store-Android.apk`, allow your browser/file manager to install apps, and open it.',
-              'Already have Quarc Store? It will offer this update by itself.',
-              '',
-              'Tailscale must be connected — see README_Users.md.',
-            ].join('\n');
-            const { data: release } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: tag,
-              name: `Quarc Store ${tag}`,
-              body,
-              draft: false,
-              prerelease: !context.ref.startsWith('refs/tags/'),
-            });
             await github.rest.repos.uploadReleaseAsset({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              release_id: release.id,
+              release_id: parseInt(process.env.RELEASE_ID),
               name: 'Quarc-Store-Android.apk',
               data: fs.readFileSync('mobile/android/app/build/outputs/apk/release/app-release.apk'),
+            });
+
+  publish-release:
+    needs: [create-release, build-windows, build-android]
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: parseInt(process.env.RELEASE_ID),
+              draft: false,
             });

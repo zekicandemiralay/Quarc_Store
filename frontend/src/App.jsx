@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import useAuthStore from './store/authStore';
 import useCatalogStore from './store/catalogStore';
 import useDeviceStore from './store/deviceStore';
-import { appPlugin, removeListener } from './lib/native';
+import { appPlugin, isDesktop, removeListener } from './lib/native';
 import Layout from './components/Layout';
 import Toasts from './components/Toasts';
 import ApprovalWatcher from './components/ApprovalWatcher';
@@ -78,6 +78,31 @@ export default function App() {
     });
     return () => removeListener(handle);
   }, [checkSession]);
+
+  // Windows: there is no "resume" event. Coming back to the window (e.g. after an app was
+  // installed or removed outside the Store) re-reads what's installed and the session, and looks
+  // for new releases at most every 5 minutes; an open Store also checks every 30 minutes.
+  useEffect(() => {
+    if (!isDesktop()) return undefined;
+    let lastCheck = Date.now();
+    const look = (force) => {
+      if (force || Date.now() - lastCheck > 5 * 60 * 1000) {
+        lastCheck = Date.now();
+        loadCatalog();
+      }
+      useDeviceStore.getState().refresh();
+    };
+    const onFocus = () => {
+      look(false);
+      checkSession();
+    };
+    window.addEventListener('focus', onFocus);
+    const timer = setInterval(() => look(true), 30 * 60 * 1000);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      clearInterval(timer);
+    };
+  }, [checkSession, loadCatalog]);
 
   useEffect(() => {
     const app = appPlugin();

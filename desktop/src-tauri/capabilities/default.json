@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "The Store window. Its pages are bundled in the app (not loaded from a server), and the only things they can ask for are the app's own commands in src/main.rs (install, update, open and remove Quarc apps) plus Tauri's events.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

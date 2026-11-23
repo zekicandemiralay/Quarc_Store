@@ -5,7 +5,7 @@ import { LogOut, Smartphone, Monitor, KeyRound, ShieldCheck, X, Bell, Languages 
 import useAuthStore from '../store/authStore';
 import useCatalogStore from '../store/catalogStore';
 import { api } from '../lib/api';
-import { isNative, ssoHost, storeNative } from '../lib/native';
+import { isAndroid, isNative, ssoHost, storeNative } from '../lib/native';
 import { timeAgo } from '../lib/format';
 import { toast } from '../store/toastStore';
 import LoginForm from '../components/LoginForm';
@@ -17,6 +17,7 @@ function useAppName() {
   return useCallback(
     (client) => {
       if (client === 'quarc-store') return 'Quarc Store (Android)';
+      if (client === 'quarc-store-windows') return 'Quarc Store (Windows)';
       const app = apps.find((a) => a.packageName === client);
       return app ? app.name : client;
     },
@@ -106,7 +107,7 @@ function Sessions() {
       <div className="card divide-y divide-zinc-800">
         {roots.map((s) => {
           const kids = childrenOf(s.id);
-          const mobile = /android|quarc-store|iphone|ipad/i.test(`${s.client} ${s.device}`) || kids.length > 0;
+          const mobile = /android|quarc-store(?!-windows)|iphone|ipad/i.test(`${s.client} ${s.device}`) || kids.length > 0;
           return (
             <div key={s.id} className="p-3.5">
               <div className="flex items-start gap-3">
@@ -283,7 +284,8 @@ export default function Account() {
   const logout = useAuthStore((s) => s.logout);
   const [params, setParams] = useSearchParams();
   const [confirmOut, setConfirmOut] = useState(false);
-  const native = isNative();
+  // Single sign-on and "this phone" only exist on Android.
+  const native = isAndroid();
   const returnTo = params.get('return');
 
   // Arrived from another app ("Sign in with Quarc Store") while already signed in: go straight back.

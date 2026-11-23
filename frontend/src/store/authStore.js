@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { api, apiUrl, API_BASE } from '../lib/api';
-import { isNative, ssoHost, storeNative } from '../lib/native';
+import { isAndroid, isDesktop, ssoHost, storeNative } from '../lib/native';
 
-// The Store's own login. On Android it is also *the device's* Quarc login:
+// The Store's own login. On Android it is also *the device's* Quarc login (on Windows each app keeps its own):
 // after every successful login/session check the session is handed to the
 // native SSO host (QuarcSsoHost), which is where other Quarc apps on this
 // phone get theirs from. Signing out here signs those apps out too.
@@ -40,9 +40,15 @@ async function signOutDevice() {
 
 async function loginBody(username, password) {
   const body = { username, password };
-  if (isNative()) {
+  if (isAndroid()) {
     // Only sessions created with this client label may sign in other apps.
     body.client = 'quarc-store';
+    const info = await storeNative()?.deviceInfo().catch(() => null);
+    if (info?.model) body.device = info.model;
+  } else if (isDesktop()) {
+    // A different label on purpose: only the phone's Store session may sign in other apps or
+    // approve a computer's sign-in. This one is just named in the "Where you are signed in" list.
+    body.client = 'quarc-store-windows';
     const info = await storeNative()?.deviceInfo().catch(() => null);
     if (info?.model) body.device = info.model;
   }

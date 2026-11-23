@@ -28,3 +28,25 @@ jobs:
       - name: Frontend — translations complete, builds
         working-directory: frontend
         run: npm install && npm run i18n:check && npm run build
+
+  desktop-windows:
+    # The Windows Store app: the rules for what it may download and run, and the registry lookup.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build the Store pages (the desktop app embeds them at compile time)
+        working-directory: frontend
+        run: npm install && npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Windows Store app — install rules, registry lookup
+        working-directory: desktop/src-tauri
+        run: cargo test

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ShieldCheck } from 'lucide-react';
 import useAuthStore from '../store/authStore';
-import { isNative } from '../lib/native';
+import { isAndroid } from '../lib/native';
 import PhoneSignIn from './PhoneSignIn';
 
 export default function LoginForm({ onSuccess }) {
@@ -49,7 +49,7 @@ export default function LoginForm({ onSuccess }) {
         <p className="mt-1 text-sm text-zinc-500">{t('auth.oneAccount', 'One account for every Quarc app.')}</p>
       </div>
 
-      {isNative() && (
+      {isAndroid() && (
         <div className="mb-4 flex gap-2.5 rounded-xl border border-accent/30 bg-accent-soft p-3 text-sm text-emerald-200">
           <ShieldCheck size={18} className="mt-0.5 shrink-0 text-accent" />
           <p>{t('auth.ssoHint', 'Signing in here signs you in to every Quarc app on this phone — no separate logins needed.')}</p>
@@ -96,7 +96,7 @@ export default function LoginForm({ onSuccess }) {
           {busy ? t('auth.working', 'Please wait…') : isLogin ? t('auth.signIn', 'Sign in') : t('auth.createAccount', 'Create account')}
         </button>
       </form>
-      {!isNative() && isLogin && (
+      {!isAndroid() && isLogin && (
         <div className="mt-4">
           <PhoneSignIn
             onSignedIn={async () => {
