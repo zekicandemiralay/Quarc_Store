@@ -87,6 +87,19 @@ const DEFAULT_APPS = [
     sort_order: 60,
   },
   {
+    id: 'reader',
+    name: 'Quarc Reader',
+    tagline: 'Read, highlight and annotate PDFs',
+    description:
+      'Your PDF library on every device: highlight text, write and draw with a pen, add notes and note pages, then export an annotated copy or share a read-only link. Each document can stay on this device or sync.',
+    repo: `${OWNER}/Quarc_Reader`,
+    package_name: 'com.quarc.reader',
+    web_url: `${HOST}:4008`,
+    icon_url: `${HOST}:4008/logo.png`,
+    accent: '#9b51f2',
+    sort_order: 70,
+  },
+  {
     id: 'store',
     name: 'Quarc Store',
     tagline: 'Every Quarc app, one login',

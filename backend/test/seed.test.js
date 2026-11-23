@@ -23,13 +23,16 @@ try {
   const insert = db.prepare(
     'INSERT INTO apps (id, name, repo, package_name, sort_order) VALUES (@id, @name, @repo, @package_name, @sort_order)'
   );
-  for (const app of DEFAULT_APPS.filter((a) => a.id !== 'sport')) insert.run(app);
+  const firstSix = ['music', 'notes', 'calendar', 'weather', 'translate', 'store'];
+  for (const app of DEFAULT_APPS.filter((a) => firstSix.includes(a.id))) insert.run(app);
   setMeta('seeded', '2026-11-18T00:00:00Z');
   // ...where the admin had since deleted Translate.
   db.prepare("DELETE FROM apps WHERE id = 'translate'").run();
 
   seed();
   assert.ok(ids().includes('sport'), 'Quarc Sport added to the existing catalog');
+  assert.ok(ids().includes('reader'), 'Quarc Reader added to the existing catalog');
+  assert.match(db.prepare("SELECT web_url FROM apps WHERE id = 'reader'").get().web_url, /:4008$/);
   assert.ok(!ids().includes('translate'), 'an app the admin deleted stays deleted');
   const sport = db.prepare("SELECT * FROM apps WHERE id = 'sport'").get();
   assert.equal(sport.package_name, 'com.quarc.sport');
