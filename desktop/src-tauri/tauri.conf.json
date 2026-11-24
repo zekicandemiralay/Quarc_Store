@@ -33,11 +33,12 @@
         "label": "main",
         "title": "Quarc Store",
         "width": 1000,
-        "height": 760,
+        "height": 650,
         "minWidth": 420,
-        "minHeight": 560,
+        "minHeight": 520,
         "resizable": true,
         "fullscreen": false,
+        "maximized": true,
         "useHttpsScheme": true,
         "backgroundColor": "#09090b"
       }
