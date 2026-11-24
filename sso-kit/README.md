@@ -156,6 +156,22 @@ working.
 
 The web side (`storeSso.js`, `StoreLoginButton.jsx`, the `authStore` hooks) is the same code as on Android.
 
+**An app that carries its own page** (Weather on Windows: `desktop/src-tauri/tauri.windows.conf.json` drops
+the window's server URL and CI packs the built frontend into the app). Its window shows
+`http://tauri.localhost`, not the server, so the origin check in `quarc_sso.rs` (`window_may_use`) also accepts
+that host: nobody else can be shown there, and the login still only goes to the server it was made for (the
+page's `serverOrigin` is its baked-in `VITE_API_URL`). Two traps that came with it:
+
+- `tauri.windows.conf.json` **replaces** the whole `windows` list of `tauri.conf.json` on Windows. Window
+  size, `maximized` and the like must be set *there*; changing only `tauri.conf.json` does nothing on Windows.
+- Such an app must not keep a service worker (Weather's `public/sw.js` removes itself on `tauri.localhost`). A
+  worker that answers from its cache serves the previous version's page after an update, whose script files are
+  no longer inside the app, and the window stays blank.
+
+**If the first sync fails** (network hiccup just as the app opens), `storeSso.js` retries it quietly on Windows —
+after 1.5 s, 4 s and 9 s — and tells the app (the same callback as a window-focus re-check) once it was applied.
+Android is unchanged.
+
 ## 3. List it in the Store
 
 Store → Admin → Catalog → **Add app**: id, name, GitHub repo, Android package name, web
