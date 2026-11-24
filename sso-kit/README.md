@@ -164,9 +164,16 @@ page's `serverOrigin` is its baked-in `VITE_API_URL`). Two traps that came with 
 
 - `tauri.windows.conf.json` **replaces** the whole `windows` list of `tauri.conf.json` on Windows. Window
   size, `maximized` and the like must be set *there*; changing only `tauri.conf.json` does nothing on Windows.
-- Such an app must not keep a service worker (Weather's `public/sw.js` removes itself on `tauri.localhost`). A
-  worker that answers from its cache serves the previous version's page after an update, whose script files are
-  no longer inside the app, and the window stays blank.
+- Such an app must not keep a service worker (Weather's `public/sw.js` removes itself on `tauri.localhost`, and
+  its page no longer registers one). A worker that answers from its cache serves the previous version's page
+  after an update, whose script files are no longer inside the app (the app's page loader answers an unknown
+  path with its index page, which the worker cached under the script's name), and the window stays blank.
+  **Limit:** a worker that is ALREADY installed cannot be replaced by a newer one in this app (the browser's own
+  background fetch of `/sw.js` is not served by the page loader: "unknown error when fetching the script"), and
+  the new page code cannot run while the page is blank. On a PC that still has the old worker, it has to be
+  cleared from outside: unregister it and delete its caches in the window (done by hand on the first PC,
+  2026-11-24), or delete `%LOCALAPPDATA%com.quarc.weatherEBWebViewDefaultService Worker` while the app is
+  closed. A fresh install, or a PC cleared once, never has the problem again.
 
 **If the first sync fails** (network hiccup just as the app opens), `storeSso.js` retries it quietly on Windows —
 after 1.5 s, 4 s and 9 s — and tells the app (the same callback as a window-focus re-check) once it was applied.
