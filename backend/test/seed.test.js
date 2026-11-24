@@ -32,6 +32,9 @@ try {
   seed();
   assert.ok(ids().includes('sport'), 'Quarc Sport added to the existing catalog');
   assert.ok(ids().includes('reader'), 'Quarc Reader added to the existing catalog');
+  assert.ok(ids().includes('draw'), 'Quarc Draw added to the existing catalog');
+  assert.match(db.prepare("SELECT web_url FROM apps WHERE id = 'draw'").get().web_url, /:4009$/);
+  assert.equal(db.prepare("SELECT package_name FROM apps WHERE id = 'draw'").get().package_name, 'com.quarc.draw');
   assert.match(db.prepare("SELECT web_url FROM apps WHERE id = 'reader'").get().web_url, /:4008$/);
   assert.ok(!ids().includes('translate'), 'an app the admin deleted stays deleted');
   const sport = db.prepare("SELECT * FROM apps WHERE id = 'sport'").get();

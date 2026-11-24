@@ -40,6 +40,7 @@ const DEFAULT_APP_PORTS = {
   4006: 'Quarc Store',
   4007: 'Quarc Sport',
   4008: 'Quarc Reader',
+  4009: 'Quarc Draw',
 };
 
 function appPorts() {

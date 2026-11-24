@@ -100,6 +100,19 @@ const DEFAULT_APPS = [
     sort_order: 70,
   },
   {
+    id: 'draw',
+    name: 'Quarc Draw',
+    tagline: 'Draw, paint and sketch',
+    description:
+      'A layered drawing studio: pressure-sensitive brushes, vector shapes, filters, notebooks and PDF markup. Everything works offline; sign in to sync your drawings on every device.',
+    repo: `${OWNER}/Quarc_Draw`,
+    package_name: 'com.quarc.draw',
+    web_url: `${HOST}:4009`,
+    icon_url: `${HOST}:4009/logo.png`,
+    accent: '#14b8a6',
+    sort_order: 80,
+  },
+  {
     id: 'store',
     name: 'Quarc Store',
     tagline: 'Every Quarc app, one login',

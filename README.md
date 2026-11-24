@@ -71,7 +71,7 @@ bash check.sh
 ```
 
 The Store is at **`https://quarcnet0.tail84500c.ts.net:4006`** (Music 4000, Notes 4001,
-Weather 4002, Translate 4003, Calendar 4005, Sport 4007, Reader 4008).
+Weather 4002, Translate 4003, Calendar 4005, Sport 4007, Reader 4008, Draw 4009).
 
 Within a minute the backend has fetched every app's releases from GitHub and computed each
 Android app's signing fingerprint — that's what turns on single sign-on for that app

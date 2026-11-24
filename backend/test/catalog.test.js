@@ -42,7 +42,7 @@ authStub.listen(0, async () => {
       let r = await get('/api/store/catalog');
       assert.equal(r.status, 200);
       const ids = r.json.apps.map((a) => a.id);
-      assert.deepEqual([...ids].sort(), ['calendar', 'music', 'notes', 'reader', 'sport', 'store', 'translate', 'weather']);
+      assert.deepEqual([...ids].sort(), ['calendar', 'draw', 'music', 'notes', 'reader', 'sport', 'store', 'translate', 'weather']);
       assert.ok(r.json.apps.every((a) => a.packageName), 'every listed app is an Android app');
       ok(`seeded catalog (Android apps only): ${ids.join(', ')}`);
 
