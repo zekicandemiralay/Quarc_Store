@@ -204,8 +204,9 @@ is asking:
   its own browser cookie jar as the usual httpOnly `token` cookie. The page-side code is the same
   `storeSso.js` as on Android.
 - Because the app windows show pages from the server, the commands are listed in `build.rs`
-  (`AppManifest`) and allowed in `capabilities/default.json`: Tauri refuses app commands from remote
-  pages otherwise.
+  (`AppManifest`) and allowed in a capability that names the server address under `remote.urls`
+  (`capabilities/default.json`, or `capabilities/quarc-sso.json` for apps without a `remote` section):
+  Tauri refuses app commands from remote pages otherwise.
 - Trust: Android checks the calling app's signing key; on Windows any program running as the same user
   can read these files. That is no new exposure (it can already read the apps' cookies); DPAPI keeps the
   Store's login from other Windows users and from copies of the folder.

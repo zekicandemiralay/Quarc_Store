@@ -131,9 +131,28 @@ fn main() {
 }
 ```
 
-`desktop/src-tauri/capabilities/default.json` — add to `permissions`:
-`"allow-quarc-sso-peek"`, `"allow-quarc-sso-sync"`, `"allow-quarc-sso-open-store"`.
-(If the app has commands of its own, list them in the manifest too and allow them, or they stop working.)
+**Capability.** The three permissions `allow-quarc-sso-peek`, `allow-quarc-sso-sync` and
+`allow-quarc-sso-open-store` must be granted to the server address the window shows, i.e. to a capability
+with that address under `remote.urls`:
+
+- if `capabilities/default.json` already has a `remote.urls` entry for the app (Music, Reader), add them
+  to its `permissions`;
+- if it has no `remote` section (Notes, Calendar, Weather, Translate, Sport), add a file
+  `capabilities/quarc-sso.json` — and leave `default.json` alone:
+
+```json
+{
+  "identifier": "quarc-sso",
+  "windows": ["main"],
+  "remote": { "urls": ["https://quarcnet0.tail84500c.ts.net:<the app's port>/*"] },
+  "permissions": ["allow-quarc-sso-peek", "allow-quarc-sso-sync", "allow-quarc-sso-open-store"]
+}
+```
+
+Without a matching `remote.urls` entry the page cannot call the commands at all (the app logs
+"quarc_sso_peek not allowed" and never signs in): this was missing from five apps in their first Windows
+release. If the app has commands of its own, list them in the manifest too and allow them, or they stop
+working.
 
 The web side (`storeSso.js`, `StoreLoginButton.jsx`, the `authStore` hooks) is the same code as on Android.
 
