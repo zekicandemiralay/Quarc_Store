@@ -144,6 +144,21 @@ async function run() {
   // on the device by the SSO kit; this only checks the server side.)
   ok('store logout revokes every app session it minted; logins on other devices stay');
 
+  // Quarc Store on Windows (client=quarc-store-windows) may mint too, and its apps die with it
+  const winLogin = await fetch(base + '/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Real-IP': '10.0.0.3' },
+    body: JSON.stringify({ username: 'alice', password: 'password1', client: 'quarc-store-windows', device: 'TEST-PC (Windows)' }),
+  });
+  const winCookie = cookieFrom(winLogin);
+  r = await call('POST', '/api/auth/sso/token', { bearer: winCookie.slice(6), body: { client: 'com.quarc.reader', device: 'TEST-PC (Windows)' } });
+  assert.equal(r.status, 200);
+  const readerToken = r.json.token;
+  assert.equal((await call('GET', '/api/auth/me', { cookie: `token=${readerToken}` })).status, 200);
+  await call('POST', '/api/auth/logout', { cookie: winCookie });
+  assert.equal((await call('GET', '/api/auth/me', { cookie: `token=${readerToken}` })).status, 401);
+  ok('the Windows Store can mint app sessions; signing it out ends them');
+
   // Sign out everywhere (keep current)
   const store2 = await storeLogin();
   r = await call('POST', '/api/auth/sso/token', { bearer: store2.slice(6), body: { client: 'com.quarc.music' } });

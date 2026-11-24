@@ -5,7 +5,7 @@ import { LogOut, Smartphone, Monitor, KeyRound, ShieldCheck, X, Bell, Languages 
 import useAuthStore from '../store/authStore';
 import useCatalogStore from '../store/catalogStore';
 import { api } from '../lib/api';
-import { isAndroid, isNative, ssoHost, storeNative } from '../lib/native';
+import { isDesktop, isNative, ssoHost, storeNative } from '../lib/native';
 import { timeAgo } from '../lib/format';
 import { toast } from '../store/toastStore';
 import LoginForm from '../components/LoginForm';
@@ -43,9 +43,13 @@ function DeviceSso() {
       <div className="flex gap-3">
         <ShieldCheck className="mt-0.5 shrink-0 text-emerald-400" size={20} />
         <div>
-          <p className="text-sm font-semibold text-white">{t('account.ssoOn', 'Single sign-on is on for this phone')}</p>
+          <p className="text-sm font-semibold text-white">
+            {isDesktop() ? t('account.ssoOnPc', 'Single sign-on is on for this PC') : t('account.ssoOn', 'Single sign-on is on for this phone')}
+          </p>
           <p className="mt-0.5 text-xs text-zinc-400">
-            {t('account.ssoBody', 'Quarc apps on this phone sign in with this account automatically. Signing out here signs them out too.')}
+            {isDesktop()
+              ? t('account.ssoBodyPc', 'Quarc apps on this PC sign in with this account automatically. Signing out here signs them out too.')
+              : t('account.ssoBody', 'Quarc apps on this phone sign in with this account automatically. Signing out here signs them out too.')}
           </p>
         </div>
       </div>
@@ -107,7 +111,7 @@ function Sessions() {
       <div className="card divide-y divide-zinc-800">
         {roots.map((s) => {
           const kids = childrenOf(s.id);
-          const mobile = /android|quarc-store(?!-windows)|iphone|ipad/i.test(`${s.client} ${s.device}`) || kids.length > 0;
+          const mobile = !/windows/i.test(`${s.client} ${s.device}`) && (/android|quarc-store|iphone|ipad/i.test(`${s.client} ${s.device}`) || kids.length > 0);
           return (
             <div key={s.id} className="p-3.5">
               <div className="flex items-start gap-3">
@@ -284,8 +288,8 @@ export default function Account() {
   const logout = useAuthStore((s) => s.logout);
   const [params, setParams] = useSearchParams();
   const [confirmOut, setConfirmOut] = useState(false);
-  // Single sign-on and "this phone" only exist on Android.
-  const native = isAndroid();
+  // Single sign-on: Android and Windows. ("This device" is the phone or the PC.)
+  const native = isNative();
   const returnTo = params.get('return');
 
   // Arrived from another app ("Sign in with Quarc Store") while already signed in: go straight back.
@@ -345,7 +349,11 @@ export default function Account() {
 
       {confirmOut && (
         <Modal title={t('auth.signOut', 'Sign out')} onClose={() => setConfirmOut(false)}>
-          <p className="text-sm text-zinc-400">{t('account.signOutBody', 'This signs you out of Quarc Store and of every Quarc app on this phone.')}</p>
+          <p className="text-sm text-zinc-400">
+            {isDesktop()
+              ? t('account.signOutBodyPc', 'This signs you out of Quarc Store and of every Quarc app on this PC.')
+              : t('account.signOutBody', 'This signs you out of Quarc Store and of every Quarc app on this phone.')}
+          </p>
           <div className="mt-4 flex justify-end gap-2">
             <button className="btn-ghost" onClick={() => setConfirmOut(false)}>{t('action.cancel', 'Cancel')}</button>
             <button

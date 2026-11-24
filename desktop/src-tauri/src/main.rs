@@ -7,14 +7,31 @@
 //! is done here by the commands below, which the page reaches through `frontend/src/lib/native.js`.
 
 mod installer;
+// Single sign-on: the files the Store and the apps share. One copy, used here and carried by every app.
+#[path = "../../../sso-kit/desktop/quarc_sso_shared.rs"]
+mod quarc_sso_shared;
 mod registry;
 mod rules;
+mod sso;
 
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, Webview};
+
+/// A `quarcstore://` link the Store was started with (another Quarc app opening it: sign in, an app's page).
+/// The page picks it up once it is ready.
+#[derive(Default)]
+struct LaunchUrl(Mutex<Option<String>>);
+
+fn launch_url_in<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
+    args.into_iter().skip(1).find(|a| {
+        a.starts_with("quarcstore://")
+            && a.len() < 200
+            && a.bytes().all(|b| b.is_ascii_alphanumeric() || b"/:?=&._-%".contains(&b))
+    })
+}
 
 /// What the page asks for: `{ apps: { "<package>": { installed, versionName, ... } } }`.
 #[tauri::command]
@@ -103,26 +120,62 @@ async fn debug_self_update(app: AppHandle, path: String) -> Result<(), String> {
 /// A name for this PC in the "Where you are signed in" list.
 #[tauri::command]
 fn device_info() -> Value {
-    let name = std::env::var("COMPUTERNAME").unwrap_or_default();
-    let model = if name.is_empty() {
-        "Windows PC".to_string()
-    } else {
-        format!("{name} (Windows)")
-    };
-    json!({ "model": model })
+    json!({ "model": sso::device_label() })
+}
+
+// ── Single sign-on: the Store as this PC's Quarc login (see sso.rs) ──────────────────────────────
+
+/// After a sign-in or session check: share the Store's login with the Quarc apps on this PC.
+#[tauri::command]
+async fn sso_sync_session(app: AppHandle, webview: Webview, origin: String, user: Value) -> Result<Value, String> {
+    sso::sync_session(&app, &webview, &origin, user).await
+}
+
+#[tauri::command]
+async fn sso_sign_out(app: AppHandle) -> Value {
+    sso::sign_out(&app).await
+}
+
+#[tauri::command]
+fn sso_get_state() -> Value {
+    sso::get_state()
+}
+
+#[tauri::command]
+fn sso_list_clients() -> Value {
+    sso::list_clients()
+}
+
+/// The `quarcstore://` link the Store was started with, once.
+#[tauri::command]
+fn take_launch_url(state: State<'_, LaunchUrl>) -> Option<String> {
+    state.0.lock().unwrap().take()
 }
 
 fn main() {
     let builder = tauri::Builder::default()
         // First, as the plugin requires: opening the Store again brings the open window forward.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if let Some(url) = launch_url_in(args) {
+                let _ = app.emit("store-open-url", url);
+            }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
             }
         }))
-        .manage(installer::Tasks::default());
+        .manage(installer::Tasks::default())
+        .manage(LaunchUrl::default())
+        .setup(|app| {
+            let handle = app.handle().clone();
+            // Tell the apps where the Store is, and pick up a link we were started with.
+            sso::announce(&handle);
+            if let Some(url) = launch_url_in(std::env::args()) {
+                *app.state::<LaunchUrl>().0.lock().unwrap() = Some(url);
+            }
+            Ok(())
+        });
 
     #[cfg(debug_assertions)]
     let builder = builder.invoke_handler(tauri::generate_handler![
@@ -133,6 +186,11 @@ fn main() {
         launch,
         open_url,
         device_info,
+        sso_sync_session,
+        sso_sign_out,
+        sso_get_state,
+        sso_list_clients,
+        take_launch_url,
         debug_self_update
     ]);
     #[cfg(not(debug_assertions))]
@@ -143,10 +201,36 @@ fn main() {
         uninstall,
         launch,
         open_url,
-        device_info
+        device_info,
+        sso_sync_session,
+        sso_sign_out,
+        sso_get_state,
+        sso_list_clients,
+        take_launch_url
     ]);
 
     builder
         .run(tauri::generate_context!())
         .expect("error while running Quarc Store");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn picks_up_a_quarcstore_link_and_nothing_else() {
+        let url = "quarcstore://login?return=com.quarc.music";
+        assert_eq!(launch_url_in(args(&["quarc-store.exe", url])).as_deref(), Some(url));
+        // The first argument is the program itself.
+        assert_eq!(launch_url_in(args(&[url])), None);
+        assert_eq!(launch_url_in(args(&["quarc-store.exe"])), None);
+        assert_eq!(launch_url_in(args(&["quarc-store.exe", "https://evil.example"])), None);
+        assert_eq!(launch_url_in(args(&["quarc-store.exe", "quarcstore://app/x y"])), None);
+        assert_eq!(launch_url_in(args(&["quarc-store.exe", "quarcstore://login?return=a\"b"])), None);
+    }
 }

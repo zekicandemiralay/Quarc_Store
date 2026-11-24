@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import useAuthStore from './store/authStore';
 import useCatalogStore from './store/catalogStore';
 import useDeviceStore from './store/deviceStore';
-import { appPlugin, isDesktop, removeListener } from './lib/native';
+import { appPlugin, desktopDeepLinks, isDesktop, removeListener } from './lib/native';
 import Layout from './components/Layout';
 import Toasts from './components/Toasts';
 import ApprovalWatcher from './components/ApprovalWatcher';
@@ -115,6 +115,16 @@ export default function App() {
     const handle = app.addListener('appUrlOpen', (e) => go(e.url));
     return () => removeListener(handle);
   }, [navigate]);
+
+  // The same links on Windows (another Quarc app opened the Store).
+  useEffect(
+    () =>
+      desktopDeepLinks((url) => {
+        const route = routeForDeepLink(url);
+        if (route) navigate(route);
+      }),
+    [navigate]
+  );
 
   return (
     <>

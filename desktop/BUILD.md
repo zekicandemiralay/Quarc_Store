@@ -11,6 +11,8 @@ Store it can install, update, open and remove the Quarc desktop apps — see
 | `installer.rs` | download, run an installer silently, start an app, remove an app, update the Store itself |
 | `registry.rs` | finds installed Quarc apps in Windows' list of installed programs |
 | `rules.rs` | what may be downloaded and run (GitHub releases of this owner's Quarc apps only); unit-tested |
+| `sso.rs` | the Store as the PC's Quarc login: keeps the Store's login and the "epoch" for the apps (see "Single sign-on on Windows" in the main README) |
+| `../../sso-kit/desktop/quarc_sso_shared.rs` | the files the Store and the apps share; built into the Store from there |
 
 ## Prerequisites (one-time setup)
 

@@ -1,7 +1,7 @@
 # Quarc Store SSO kit
 
-What a Quarc app needs so that, on Android, it signs in with Quarc Store's login. Already
-applied to Music, Notes, Weather, Translate and Calendar.
+What a Quarc app needs so that, on Android and on Windows, it signs in with Quarc Store's login.
+Already applied to Music, Notes, Weather, Translate, Calendar, Sport and Reader.
 
 Requirements for the app: Capacitor Android app, login through the shared quarc-auth
 (`/api/auth/*`), a zustand `authStore` with `checkSession()`, and `lib/apiUrl.js` exporting
@@ -90,6 +90,53 @@ updateViaStore().then((viaStore) => {
 });
 ```
 
+**Windows (the Tauri desktop app)** — `install.sh` copied `desktop/src-tauri/src/quarc_sso.rs` and
+`quarc_sso_shared.rs`. Then, once:
+
+`desktop/src-tauri/src/main.rs`:
+
+```rust
+mod quarc_sso;
+mod quarc_sso_shared;
+
+// on the builder:
+.invoke_handler(tauri::generate_handler![
+    quarc_sso::quarc_sso_peek,
+    quarc_sso::quarc_sso_sync,
+    quarc_sso::quarc_sso_open_store
+])
+```
+
+`desktop/src-tauri/Cargo.toml`:
+
+```toml
+[dependencies]
+serde_json = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+```
+
+`desktop/src-tauri/build.rs` — the window shows a page from the server, and Tauri only lets such a
+page call app commands that are listed here *and* allowed in the capability:
+
+```rust
+fn main() {
+    tauri_build::try_build(
+        tauri_build::Attributes::new().app_manifest(
+            tauri_build::AppManifest::new().commands(&["quarc_sso_peek", "quarc_sso_sync", "quarc_sso_open_store"]),
+        ),
+    )
+    .expect("failed to run tauri-build");
+}
+```
+
+`desktop/src-tauri/capabilities/default.json` — add to `permissions`:
+`"allow-quarc-sso-peek"`, `"allow-quarc-sso-sync"`, `"allow-quarc-sso-open-store"`.
+(If the app has commands of its own, list them in the manifest too and allow them, or they stop working.)
+
+The web side (`storeSso.js`, `StoreLoginButton.jsx`, the `authStore` hooks) is the same code as on Android.
+
 ## 3. List it in the Store
 
 Store → Admin → Catalog → **Add app**: id, name, GitHub repo, Android package name, web
@@ -105,7 +152,21 @@ release APK's signing fingerprint and single sign-on is live for that app.
 4. Sign in to the app with its own form → switch away and back: still signed in.
 5. Uninstall the Store → the app's own login still works.
 
-## Protocol reference
+## Protocol reference (Windows)
+
+Folder `%LOCALAPPDATA%/Quarc/sso` (`sso-kit/desktop/quarc_sso_shared.rs`):
+
+| file | holds |
+|---|---|
+| `state.json` | `state` (`none` | `signed_in` | `signed_out`), `epoch`, `user`, `origin`, `store.exe`/`store.version` (no secrets) |
+| `session.dat` | the Store's own login `{token, origin}`, DPAPI-protected (the Store writes it, apps read it) |
+| `applied/<package>` | the epoch that app last applied (the Store's "apps signed in here" list) |
+
+The Store writes `session.dat` first and `state.json` after it; on sign-out `state.json` first and
+`session.dat` removed after. An app that sees a new epoch asks `POST /api/auth/sso/token` for its own
+login (the server only allows the sessions labelled `quarc-store` or `quarc-store-windows`).
+
+## Protocol reference (Android)
 
 Provider `content://com.quarc.store.sso`, via `ContentResolver.call(uri, method, null, null)`:
 

@@ -22,6 +22,12 @@ const SESSION_SECS = SESSION_DAYS * 24 * 60 * 60;
 // carrying it may mint sessions for other apps (POST /api/auth/sso/token).
 const STORE_CLIENT = 'quarc-store';
 
+// Quarc Store on Windows logs in with its own label. It may mint sessions for the Quarc apps on the same PC
+// (single sign-on, like the Android Store), but it is deliberately NOT STORE_CLIENT: only the phone's Store
+// may approve another computer's sign-in (routes/approval.js).
+const STORE_WINDOWS_CLIENT = 'quarc-store-windows';
+const SSO_MINT_CLIENTS = [STORE_CLIENT, STORE_WINDOWS_CLIENT];
+
 // Where a browser login came from, keyed by the port in its Origin header —
 // purely a display label for the sessions list. Overridable via APP_PORTS,
 // e.g. "4000=Quarc Music,4001=Quarc Notes".
@@ -229,6 +235,8 @@ module.exports = {
   SECURE_COOKIE,
   SESSION_SECS,
   STORE_CLIENT,
+  STORE_WINDOWS_CLIENT,
+  SSO_MINT_CLIENTS,
   now,
   cookieOptions,
   clearCookie,

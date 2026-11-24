@@ -9,7 +9,7 @@ const { requireAuth } = require('../middleware/auth');
 const {
   SECRET,
   SESSION_SECS,
-  STORE_CLIENT,
+  SSO_MINT_CLIENTS,
   now,
   clearCookie,
   cleanText,
@@ -174,7 +174,7 @@ const PACKAGE_RE = /^[a-zA-Z][\w]*(\.[a-zA-Z_][\w]*)+$/;
 
 router.post('/sso/token', requireAuth, (req, res) => {
   const parent = req.session;
-  if (!parent || parent.client !== STORE_CLIENT) {
+  if (!parent || !SSO_MINT_CLIENTS.includes(parent.client)) {
     return res.status(403).json({ error: 'Only a Quarc Store session can sign in other apps' });
   }
   const client = String(req.body?.client || '');

@@ -23,7 +23,10 @@
     "ssoBody": "Bu telefondaki Quarc uygulamaları bu hesapla otomatik giriş yapar. Buradan çıkış yapmak onları da çıkarır.",
     "ssoOn": "Bu telefonda tek oturum açma etkin",
     "thisDevice": "Bu cihaz",
-    "unknownDevice": "Bilinmeyen cihaz"
+    "unknownDevice": "Bilinmeyen cihaz",
+    "ssoOnPc": "Bu bilgisayarda tek oturum açma etkin",
+    "ssoBodyPc": "Bu bilgisayardaki Quarc uygulamaları bu hesapla otomatik giriş yapar. Buradan çıkış yapmak onları da çıkarır.",
+    "signOutBodyPc": "Bu işlem seni Quarc Store'dan ve bu bilgisayardaki tüm Quarc uygulamalarından çıkarır."
   },
   "action": {
     "back": "Geri",
@@ -101,7 +104,8 @@
     "ssoHint": "Buradan giriş yapınca bu telefondaki tüm Quarc uygulamalarına da giriş yapmış olursun — ayrı ayrı giriş gerekmez.",
     "username": "Kullanıcı adı",
     "welcome": "Quarc'a giriş yap",
-    "working": "Lütfen bekle…"
+    "working": "Lütfen bekle…",
+    "ssoHintPc": "Buradan giriş yapınca bu bilgisayardaki tüm Quarc uygulamalarına da giriş yapmış olursun — ayrı ayrı giriş gerekmez."
   },
   "detail": {
     "downloads": "Tüm platformlar için indirmeler",
@@ -118,7 +122,8 @@
     "source": "GitHub'da kaynak kod",
     "sso": "Quarc hesabını kullanır. Bu telefonda Quarc Store'a giriş yaptıysan bu uygulama otomatik olarak giriş yapar.",
     "webVersion": "Web sürümü",
-    "whatsNew": "v{{version}} sürümündeki yenilikler"
+    "whatsNew": "v{{version}} sürümündeki yenilikler",
+    "ssoPc": "Quarc hesabını kullanır. Bu bilgisayarda Quarc Store'a giriş yaptıysan bu uygulama otomatik olarak giriş yapar."
   },
   "home": {
     "all": "Tüm uygulamalar",
@@ -130,7 +135,8 @@
     "ssoTitle": "Bir kez giriş yap, tüm uygulamaları kullan",
     "system": "Quarc Store",
     "title": "Quarc uygulamaları",
-    "updatesTitle": "{{count}} güncelleme mevcut"
+    "updatesTitle": "{{count}} güncelleme mevcut",
+    "ssoBodyPc": "Quarc Store'a giriş yap, bu bilgisayardaki tüm Quarc uygulamalarına da giriş yapılsın."
   },
   "install": {
     "confirm": "Onayla…",

@@ -87,8 +87,18 @@ Sign in with your Quarc username and password, or with **Sign in with your phone
 
 ### What's different from Android
 
-Each Quarc desktop app keeps its own login — the Store doesn't sign them in. (You can still use
-**Sign in with your phone** in each app.) There are no background update notifications.
+There are no background update notifications.
+
+### Sign in once, use every app
+
+Sign in to Quarc Store (Account tab) and the Quarc apps on this PC are signed in too: open Quarc Music,
+Notes, … — no login screen. (Needs the current version of each app: update them from the Store.)
+
+- An app's login screen also shows **"Continue as ⟨you⟩"** when the Store is signed in, or **"Sign in
+  with Quarc Store"** (it opens the Store and brings you back).
+- **Signing out of Quarc Store signs you out of every Quarc app on this PC.** Signing out of a single
+  app only affects that app.
+- Switching accounts in the Store switches the apps.
 
 ## Web, macOS, Linux, iPhone
 

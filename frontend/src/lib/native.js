@@ -50,10 +50,34 @@ const desktopStore = {
 
 /** Install / update / launch / uninstall apps (and, on Android, background update checks). */
 export const storeNative = () => (isDesktop() ? desktopStore : plugin('QuarcStore'));
-/** The device-wide login other Quarc apps receive (Android only). */
-export const ssoHost = () => plugin('QuarcSsoHost');
+// The Store as the device's Quarc login: it keeps the login and hands every Quarc app on this device its
+// own (Android: QuarcSsoHost; Windows: desktop/src-tauri/src/sso.rs). Same four calls on both.
+const desktopSsoHost = {
+  syncSession: ({ serverOrigin, user }) => invoke('sso_sync_session', { origin: serverOrigin, user }),
+  signOut: () => invoke('sso_sign_out'),
+  getState: () => invoke('sso_get_state'),
+  listClients: () => invoke('sso_list_clients'),
+};
+
+/** The device-wide login other Quarc apps receive. */
+export const ssoHost = () => (isDesktop() ? desktopSsoHost : plugin('QuarcSsoHost'));
 /** @capacitor/app — deep links and resume events (Android only). */
 export const appPlugin = () => plugin('App');
+
+/**
+ * quarcstore:// links on Windows: another Quarc app asking the Store to open ("sign in", an app's page).
+ * The link arrives as a start argument or, if the Store is open already, as an event. Returns a cleanup function.
+ */
+export function desktopDeepLinks(onUrl) {
+  if (!isDesktop()) return () => {};
+  invoke('take_launch_url')
+    .then((url) => url && onUrl(url))
+    .catch(() => {});
+  const handle = tauri()
+    .event.listen('store-open-url', (e) => onUrl(e.payload))
+    .then((unlisten) => ({ remove: unlisten }));
+  return () => removeListener(handle);
+}
 
 /** Opens a URL outside the app (system browser on Android and Windows, new tab on the web). */
 export function openExternal(url) {

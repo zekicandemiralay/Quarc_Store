@@ -14,6 +14,7 @@
     "sessionsUnavailable": "Couldn't load your sessions.",
     "signOutAll": "Sign them out",
     "signOutBody": "This signs you out of Quarc Store and of every Quarc app on this phone.",
+    "signOutBodyPc": "This signs you out of Quarc Store and of every Quarc app on this PC.",
     "signOutEverywhere": "Sign out everywhere else",
     "signOutEverywhereBody": "Every other phone, computer and browser using your Quarc account will be signed out of every Quarc app. This device stays signed in.",
     "signOutOthersToo": "Sign out my other devices",
@@ -21,7 +22,9 @@
     "signedInApps": "Also signed in: {{apps}}",
     "signedOutOthers": "Signed out everywhere else",
     "ssoBody": "Quarc apps on this phone sign in with this account automatically. Signing out here signs them out too.",
+    "ssoBodyPc": "Quarc apps on this PC sign in with this account automatically. Signing out here signs them out too.",
     "ssoOn": "Single sign-on is on for this phone",
+    "ssoOnPc": "Single sign-on is on for this PC",
     "thisDevice": "This device",
     "unknownDevice": "Unknown device"
   },
@@ -109,6 +112,7 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "ssoHint": "Signing in here signs you in to every Quarc app on this phone — no separate logins needed.",
+    "ssoHintPc": "Signing in here signs you in to every Quarc app on this PC — no separate logins needed.",
     "username": "Username",
     "welcome": "Sign in to Quarc",
     "working": "Please wait…"
@@ -127,6 +131,7 @@
     "size": "Size",
     "source": "Source on GitHub",
     "sso": "Uses your Quarc account. When you are signed in to Quarc Store on this phone, this app signs you in automatically.",
+    "ssoPc": "Uses your Quarc account. When you are signed in to Quarc Store on this PC, this app signs you in automatically.",
     "webVersion": "Web version",
     "whatsNew": "What's new in v{{version}}"
   },
@@ -137,6 +142,7 @@
     "loadError": "Couldn't load the app list.",
     "loading": "Loading apps…",
     "ssoBody": "Sign in to Quarc Store and all your Quarc apps on this phone are signed in too.",
+    "ssoBodyPc": "Sign in to Quarc Store and all your Quarc apps on this PC are signed in too.",
     "ssoTitle": "Sign in once, use every app",
     "system": "Quarc Store",
     "title": "Quarc apps",

@@ -58,6 +58,9 @@ async function run() {
   ok('the computer polls with its secret; a wrong secret gets nothing');
 
   assert.equal((await call('GET', '/api/auth/approval/pending', { cookie: aliceWeb })).status, 403);
+  // The Windows Store may sign other apps in (sso/token) but must not approve a computer's sign-in.
+  const aliceWindows = (await call('POST', '/api/auth/login', { body: { username: 'alice', password: 'password1', client: 'quarc-store-windows' } })).cookie;
+  assert.equal((await call('GET', '/api/auth/approval/pending', { cookie: aliceWindows })).status, 403);
   assert.deepEqual((await call('GET', '/api/auth/approval/pending', { cookie: bobStore })).json, []);
   r = await call('GET', '/api/auth/approval/pending', { cookie: aliceStore });
   assert.equal(r.json.length, 1);

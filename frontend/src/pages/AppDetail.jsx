@@ -158,10 +158,14 @@ export default function AppDetail() {
         </div>
       )}
 
-      {app.sso && !isDesktop() && (
+      {app.sso && (
         <div className="flex gap-2.5 rounded-xl border border-accent/30 bg-accent-soft p-3 text-sm text-emerald-200">
           <KeyRound size={18} className="mt-0.5 shrink-0 text-accent" />
-          <p>{t('detail.sso', 'Uses your Quarc account. When you are signed in to Quarc Store on this phone, this app signs you in automatically.')}</p>
+          <p>
+            {isDesktop()
+              ? t('detail.ssoPc', 'Uses your Quarc account. When you are signed in to Quarc Store on this PC, this app signs you in automatically.')
+              : t('detail.sso', 'Uses your Quarc account. When you are signed in to Quarc Store on this phone, this app signs you in automatically.')}
+          </p>
         </div>
       )}
       {native && info?.installed && info.silentUpdates && (

@@ -14,8 +14,8 @@ One place to get every Quarc app — and one login for all of them.
   Store, on Android and on every other platform. When the Store *is* installed, it is the
   primary source: its login wins.
 - **Windows app**: the same Store on a PC. Install, update, open and remove the Quarc
-  desktop apps from one list (each app's own Windows installer, run silently). Each desktop
-  app keeps its own login there — single sign-on is an Android feature.
+  desktop apps from one list (each app's own Windows installer, run silently). Sign in to the
+  Store once and every Quarc desktop app on that PC is signed in too, like on Android.
 - **Web version** at `https://quarcnet0.tail84500c.ts.net:4006` — the same catalog with
   downloads for every platform the apps ship on, and your account settings.
 - **Android apps only**: the catalog lists apps that have an Android build (Music, Notes,
@@ -179,11 +179,38 @@ the same code:
   The window loads no web pages from anywhere, and its content-security policy allows the Store's
   server only. If the GitHub owner ever changes, change `OWNER` in `rules.rs` too.
 - **Sign-in**: password or "Sign in with your phone". The session is labelled
-  `quarc-store-windows`, **not** `quarc-store`, so a PC can neither sign in other apps nor approve
-  other computers' sign-ins; only the phone's Store can.
-- **Not on Windows**: single sign-on across apps, background update checks and notifications. The
-  Store looks for new releases when its window is focused (at most every 5 minutes) and every 30
-  minutes while open; the Updates tab shows a badge.
+  `quarc-store-windows`, **not** `quarc-store`: it may sign in the Quarc apps on its own PC
+  (`/api/auth/sso/token`) but may not approve another computer's sign-in; only the phone's Store can.
+- **Single sign-on** works like Android's (next section) with files instead of a content provider; see
+  "Single sign-on on Windows" below.
+- **Not on Windows**: background update checks and notifications. The Store looks for new releases
+  when its window is focused (at most every 5 minutes) and every 30 minutes while open; the Updates tab
+  shows a badge.
+
+### Single sign-on on Windows
+
+Same rules as Android (the Store's state has an *epoch*; an app acts only when it changes: signing in
+to the Store signs the app in, signing out signs it out, an app's own sign-in/out afterwards is
+respected), different plumbing, because Windows has no content provider and no way to tell which program
+is asking:
+
+- The Store writes `%LOCALAPPDATA%/Quarc/sso/state.json` (state, epoch, user, where the Store is) and
+  `session.dat` (the Store's own login, protected with DPAPI for the current Windows user). File layout:
+  `sso-kit/desktop/quarc_sso_shared.rs`, used by both sides.
+- Each desktop app carries `quarc_sso.rs` (three commands: `quarc_sso_peek`, `quarc_sso_sync`,
+  `quarc_sso_open_store`). When it sees a new epoch it asks the server for a login of its own with the
+  Store's login (`curl.exe` from Windows, login passed on stdin; a child session, so signing out of the
+  Store ends it, and "Continue as …" after an app signed itself out gets a fresh one) and puts it in
+  its own browser cookie jar as the usual httpOnly `token` cookie. The page-side code is the same
+  `storeSso.js` as on Android.
+- Because the app windows show pages from the server, the commands are listed in `build.rs`
+  (`AppManifest`) and allowed in `capabilities/default.json`: Tauri refuses app commands from remote
+  pages otherwise.
+- Trust: Android checks the calling app's signing key; on Windows any program running as the same user
+  can read these files. That is no new exposure (it can already read the apps' cookies); DPAPI keeps the
+  Store's login from other Windows users and from copies of the folder.
+- An app is only signed in once it has the new commands (a new release of each); the server pages work
+  with older apps too (the Store just looks unavailable to them).
 
 ### Single sign-on on Android
 

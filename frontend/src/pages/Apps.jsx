@@ -7,7 +7,7 @@ import useAuthStore from '../store/authStore';
 import AppIcon from '../components/AppIcon';
 import AppActionButton from '../components/AppActionButton';
 import PlatformBadges from '../components/PlatformBadges';
-import { isAndroid, isNative } from '../lib/native';
+import { isDesktop, isNative } from '../lib/native';
 
 function AppRow({ app }) {
   const { t } = useTranslation();
@@ -71,12 +71,16 @@ export default function Apps() {
 
   return (
     <div className="space-y-6">
-      {isAndroid() && !user && (
+      {native && !user && (
         <Link to="/account" className="card flex items-center gap-3 border-accent/30 bg-accent-soft p-4">
           <KeyRound className="shrink-0 text-accent" size={22} />
           <div className="flex-1">
             <p className="text-sm font-semibold text-white">{t('home.ssoTitle', 'Sign in once, use every app')}</p>
-            <p className="text-xs text-emerald-200/80">{t('home.ssoBody', 'Sign in to Quarc Store and all your Quarc apps on this phone are signed in too.')}</p>
+            <p className="text-xs text-emerald-200/80">
+              {isDesktop()
+                ? t('home.ssoBodyPc', 'Sign in to Quarc Store and all your Quarc apps on this PC are signed in too.')
+                : t('home.ssoBody', 'Sign in to Quarc Store and all your Quarc apps on this phone are signed in too.')}
+            </p>
           </div>
           <ChevronRight size={18} className="text-zinc-500" />
         </Link>
