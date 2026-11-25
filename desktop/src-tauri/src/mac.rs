@@ -227,16 +227,24 @@ pub fn pids_in_ps(ps: &str, bundle: &Path) -> Vec<u32> {
         .collect()
 }
 
-/// The running copies of the app in this bundle.
+/// The running copies of the app in this bundle. A process shows its program's real path, so the bundle is
+/// matched as given and with links resolved (/var/folders/... is really /private/var/folders/...).
 pub fn running(bundle: &Path) -> Vec<u32> {
     let Ok(out) = Command::new("/bin/ps").args(["-axww", "-o", "pid=,command="]).output() else {
         return Vec::new();
     };
+    let ps = String::from_utf8_lossy(&out.stdout);
     let me = std::process::id();
-    pids_in_ps(&String::from_utf8_lossy(&out.stdout), bundle)
-        .into_iter()
-        .filter(|&p| p != me)
-        .collect()
+    let mut pids = pids_in_ps(&ps, bundle);
+    if let Ok(real) = fs::canonicalize(bundle) {
+        if real != bundle {
+            pids.extend(pids_in_ps(&ps, &real));
+        }
+    }
+    pids.sort_unstable();
+    pids.dedup();
+    pids.retain(|&p| p != me);
+    pids
 }
 
 fn signal(pids: &[u32], sig: &str) {
@@ -629,6 +637,29 @@ mod tests {
         assert!(!update_blocked_at(Path::new("/Applications/Quarc Store.app")));
     }
 
+    /// `ps` lines mentioning `needle`, for failure messages.
+    #[cfg(target_os = "macos")]
+    fn ps_matching(needle: &str) -> String {
+        let out = Command::new("/bin/ps").args(["-axww", "-o", "pid=,command="]).output().unwrap();
+        let lines: Vec<String> = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .filter(|l| l.contains(needle))
+            .map(str::to_string)
+            .collect();
+        format!("{lines:?}")
+    }
+
+    #[test]
+    fn a_running_app_is_found_by_its_real_path_too() {
+        // On a Mac /var is a link to /private/var; elsewhere this just finds nothing extra.
+        let dir = std::env::temp_dir().join(format!("quarc-mac-real-path-{}", std::process::id()));
+        fs::create_dir_all(dir.join("A.app")).unwrap();
+        let real = fs::canonicalize(dir.join("A.app")).unwrap();
+        let ps = format!("  77 {}/Contents/MacOS/a\n", real.display());
+        assert_eq!(pids_in_ps(&ps, &real), vec![77]);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     /// The whole flow on a real Mac with a real Quarc release: install from the .dmg, find it, open it, update it
     /// while it is open (closed, replaced, opened again), remove it. Needs the network; run in CI on macOS with
     /// `cargo test -- --include-ignored` (QUARC_TEST_DMG = a downloaded Quarc Notes .dmg).
@@ -663,7 +694,7 @@ mod tests {
         while running(&found.path).is_empty() && start.elapsed() < Duration::from_secs(20) {
             std::thread::sleep(Duration::from_millis(250));
         }
-        assert!(!running(&found.path).is_empty(), "the app started");
+        assert!(!running(&found.path).is_empty(), "the app started; processes: {}", ps_matching("quarc-notes"));
 
         // Update while it is open.
         let again = install(&dmg, "com.quarc.notes", &dirs, &work).expect("update over the open app");
@@ -673,7 +704,7 @@ mod tests {
         while running(&found.path).is_empty() && start.elapsed() < Duration::from_secs(20) {
             std::thread::sleep(Duration::from_millis(250));
         }
-        assert!(!running(&found.path).is_empty(), "the app was opened again after the update");
+        assert!(!running(&found.path).is_empty(), "the app was opened again after the update; processes: {}", ps_matching("quarc-notes"));
         let leftovers: Vec<_> = fs::read_dir(&apps).unwrap().flatten().map(|e| e.file_name()).collect();
         assert_eq!(leftovers.len(), 1, "only the app is left: {leftovers:?}");
 
@@ -709,7 +740,7 @@ mod tests {
         while running(&current).is_empty() && start.elapsed() < Duration::from_secs(30) {
             std::thread::sleep(Duration::from_millis(250));
         }
-        assert!(!running(&current).is_empty(), "the new Store was opened after the old one quit");
+        assert!(!running(&current).is_empty(), "the new Store was opened after the old one quit; processes: {}", ps_matching("quarc-store"));
         quit(&current);
         let left: Vec<_> = fs::read_dir(&apps).unwrap().flatten().map(|e| e.file_name()).collect();
         assert_eq!(left.len(), 1, "the replaced copy was deleted: {left:?}");
