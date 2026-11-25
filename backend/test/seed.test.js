@@ -73,6 +73,16 @@ try {
   assert.equal(texts.tagline, 'Written by the admin');
   ok("an untouched old default text is refreshed on start; the admin's own text is kept");
 
+  // Quarc Draw's first catalog text mentioned notebooks and PDF markup (v1.0.0 had them); an untouched copy is refreshed.
+  const drawDefault = DEFAULT_APPS.find((a) => a.id === 'draw');
+  assert.ok(!/notebook|PDF/i.test(drawDefault.description), 'the Draw text must not promise removed features');
+  db.prepare("UPDATE apps SET description = ? WHERE id = 'draw'").run(
+    'A layered drawing studio: pressure-sensitive brushes, vector shapes, filters, notebooks and PDF markup. Everything works offline; sign in to sync your drawings on every device.'
+  );
+  seed();
+  assert.equal(db.prepare("SELECT description FROM apps WHERE id = 'draw'").get().description, drawDefault.description);
+  ok("Quarc Draw's first catalog text is refreshed to the current one");
+
   console.log('\nAll seed tests passed.');
   process.exit(0);
 } catch (err) {

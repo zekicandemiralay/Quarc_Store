@@ -104,7 +104,7 @@ const DEFAULT_APPS = [
     name: 'Quarc Draw',
     tagline: 'Draw, paint and sketch',
     description:
-      'A layered drawing studio: pressure-sensitive brushes, vector shapes, filters, notebooks and PDF markup. Everything works offline; sign in to sync your drawings on every device.',
+      'A layered drawing studio: pressure-sensitive brushes, vector shapes, text and filters. Everything works offline; sign in to sync your drawings on every device.',
     repo: `${OWNER}/Quarc_Draw`,
     package_name: 'com.quarc.draw',
     web_url: `${HOST}:4009`,
@@ -145,6 +145,11 @@ const PREVIOUS_TEXTS = {
     tagline: ['Your Garmin activities and health'],
     description: [
       'Runs, rides and walks on a map, personal bests and training load, plus heart rate, sleep, steps and body battery, synced from Garmin Connect.',
+    ],
+  },
+  draw: {
+    description: [
+      'A layered drawing studio: pressure-sensitive brushes, vector shapes, filters, notebooks and PDF markup. Everything works offline; sign in to sync your drawings on every device.',
     ],
   },
 };
