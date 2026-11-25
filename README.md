@@ -16,6 +16,8 @@ One place to get every Quarc app — and one login for all of them.
 - **Windows app**: the same Store on a PC. Install, update, open and remove the Quarc
   desktop apps from one list (each app's own Windows installer, run silently). Sign in to the
   Store once and every Quarc desktop app on that PC is signed in too, like on Android.
+- **Mac app** (Apple silicon and Intel): install, update, open and remove the Quarc apps from
+  one list, straight into Applications. No single sign-on on a Mac yet: each app keeps its own login.
 - **Web version** at `https://quarcnet0.tail84500c.ts.net:4006` — the same catalog with
   downloads for every platform the apps ship on, and your account settings.
 - **Android apps only**: the catalog lists apps that have an Android build (Music, Notes,
@@ -26,9 +28,9 @@ One place to get every Quarc app — and one login for all of them.
 Quarc_Store/
 ├── auth/       quarc-auth — the shared login service for the whole suite
 ├── backend/    catalog service — mirrors each app's GitHub releases, computes APK signing fingerprints
-├── frontend/   the Store UI (web + bundled into the Android and Windows apps)
+├── frontend/   the Store UI (web + bundled into the Android and Windows apps; the Mac app loads it from the server)
 ├── mobile/     the Android app (Capacitor) — installer, update worker, single sign-on provider
-├── desktop/    the Windows app (Tauri) — installs, updates, opens and removes the Quarc desktop apps
+├── desktop/    the Windows and Mac app (Tauri) — installs, updates, opens and removes the Quarc desktop apps
 └── sso-kit/    the small piece every Quarc app carries to receive the Store's login
 ```
 
@@ -116,11 +118,12 @@ server migration (see `../MIGRATION.md`).
 
 ---
 
-## Part 2 — Releasing the Android and Windows apps
+## Part 2 — Releasing the Android, Windows and Mac apps
 
-Same flow as your other apps: push a tag, GitHub Actions builds and signs the APK and builds
-the Windows installer (`Quarc.Store_<version>_x64-setup.exe`, see `desktop/BUILD.md`), and
-publishes both in one release.
+Same flow as your other apps: push a tag, GitHub Actions builds and signs the APK, builds
+the Windows installer (`Quarc.Store_<version>_x64-setup.exe`) and the two Mac disk images
+(`Quarc.Store_<version>_aarch64.dmg` for Apple silicon, `..._x64.dmg` for Intel; see
+`desktop/BUILD.md`), and publishes them in one release.
 
 **One-time setup** (needs a JDK — Android Studio's bundled `jbr/bin/keytool` works):
 
@@ -144,7 +147,7 @@ it, regenerate the Android launcher icons and splash screens with `cd mobile && 
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
-The Store lists itself in its own catalog, so installed Stores (Android and Windows) pick up new versions.
+The Store lists itself in its own catalog, so installed Stores (Android, Windows and Mac) pick up new versions.
 
 **The other apps** need one new release each to carry the single sign-on piece (already
 added in their working trees — see "What changed in the other apps" below). Until an app
@@ -186,6 +189,46 @@ the same code:
 - **Not on Windows**: background update checks and notifications. The Store looks for new releases
   when its window is focused (at most every 5 minutes) and every 30 minutes while open; the Updates tab
   shows a badge.
+
+### The Mac app
+
+The same Tauri app as on Windows (`desktop/`), with the Mac parts in `desktop/src-tauri/src/mac.rs`:
+
+- **The page comes from the server**: the window opens `https://quarcnet0.tail84500c.ts.net:4006`
+  (`tauri.macos.conf.json`), not pages bundled into the app. A Mac's web view (WebKit) does not send a
+  server's login cookie to a page bundled in an app (that would be a third-party cookie), so the
+  Windows way would never stay signed in. That page, at that address only, may call the install /
+  open / remove commands (`capabilities/macos.json`). Consequence: a change to the Store pages
+  reaches Mac users with `deploy.sh frontend`, no release needed; and Tailscale must be connected
+  before the window can show anything.
+- **Which file**: the app tells the page what it runs on (`window.__QUARC_DESKTOP__ = { os, arch }`,
+  set before the page's own scripts). The page installs the release's `_aarch64.dmg` on Apple
+  silicon and `_x64.dmg` on Intel (the catalog already lists both as `macos-arm` / `macos-intel`).
+- **What's installed**: every `.app` in /Applications and ~/Applications whose Info.plist identifier
+  is `com.quarc.*`; the version is the one in there (each app release sets it from its tag).
+- **Install / update**: downloads the .dmg (only this owner's Quarc release .dmg files: `rules.rs`),
+  opens it out of sight (`hdiutil`), copies the app next to where it goes (`ditto`) and swaps it in,
+  so an app is never half-copied. New apps go to /Applications (Mac admins may write there), else
+  ~/Applications. An open copy is closed first (like the Windows installers do) and opened again after.
+- **Remove**: closes the app and deletes it from Applications; its data and settings are kept.
+- **Updating the Store**: the new Store is swapped in while the old one runs (the Mac allows that),
+  then a helper opens it once the old one has quit. Not from the opened .dmg or a not-yet-moved
+  download: the Store asks to be moved to Applications first.
+- **Gatekeeper**: the Store's .dmg is ad-hoc signed, not notarized (that needs Apple's paid developer
+  account), so the first open needs System Settings → Privacy & Security → **Open Anyway** once. Apps
+  the Store installs are downloaded by the Store itself, not a browser, so they are not marked as
+  downloaded from the internet and open without that question. If the Mac refuses to let the Store
+  change an app (macOS "App Management"), the Store says to allow it in System Settings → Privacy &
+  Security → App Management.
+- **Sign-in**: labelled `quarc-store-macos`: it may not approve another computer's sign-in nor sign other
+  apps in. **No single sign-on on a Mac yet**; the apps keep their own logins. (It would need the Store's
+  login kept in the Mac keychain, Mac paths in every app's `quarc_sso.rs`, `quarc-store-macos` added to
+  `SSO_MINT_CLIENTS`, and a release of every app.)
+- **Tested on GitHub's Mac machines** (`.github/workflows/test.yml`, job `desktop-macos`): installs a
+  real Quarc Notes .dmg, opens it, updates it while it is open, removes it; builds the Store's .dmg and
+  checks the ad-hoc signature; lets the Store replace itself from it; and runs the built app against a
+  test page (`desktop/ci/`) that calls the commands exactly as the real page may, including what must
+  be refused.
 
 ### Single sign-on on Windows
 

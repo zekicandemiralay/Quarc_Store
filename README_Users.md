@@ -100,7 +100,41 @@ Notes, … — no login screen. (Needs the current version of each app: update t
   app only affects that app.
 - Switching accounts in the Store switches the apps.
 
-## Web, macOS, Linux, iPhone
+## Mac
+
+### Install Quarc Store
+
+1. Open the [latest release](https://github.com/zekicandemiralay/Quarc_Store/releases/latest) and
+   download the .dmg for your Mac: **Quarc.Store_…_aarch64.dmg** for Apple silicon (M1 or later:
+   Apple menu → About This Mac says "Chip Apple M…"), **Quarc.Store_…_x64.dmg** for an Intel Mac.
+2. Open it and drag **Quarc Store** onto **Applications**. Open Quarc Store from your Applications folder
+   (not from the disk image).
+3. The first time, the Mac says it can't check Quarc Store for malware, because the Quarc apps aren't
+   signed with a paid Apple certificate. Click **Done**, then open **System Settings → Privacy & Security**,
+   scroll down to "Quarc Store was blocked…" and click **Open Anyway**, then **Open Anyway** again and
+   enter your Mac password. This is needed only once.
+
+Tailscale must be connected: the Store's window shows its page from the Quarc server. Sign in with your
+Quarc username and password, or with **Sign in with your phone**.
+
+### Install and update apps
+
+- **Apps** tab: every Quarc app. Press **Install**, **Update** or **Open**. The Store downloads the app and
+  puts it in your Applications folder (or your own Applications folder if you can't write to the main one).
+  Apps installed by the Store open without the "can't check for malware" question.
+- **Updates** tab: everything with a new version, with **Update all**. An open app is closed for its
+  update and opened again afterwards.
+- **Uninstall** (on an app's page) removes the app but keeps its data.
+- The Store updates itself the same way: press **Update** on Quarc Store and it restarts.
+- If the Mac says Quarc Store isn't allowed to change an app, open **System Settings → Privacy & Security
+  → App Management**, turn on **Quarc Store**, and try again.
+
+### What's different from Windows
+
+There is no single sign-on on a Mac yet: sign in to each Quarc app once, in the app itself. There are no
+background update notifications either; the Store looks for new releases whenever you come back to it.
+
+## Web, Linux, iPhone
 
 Open **https://quarcnet0.tail84500c.ts.net:4006** in a browser: the same list of apps,
 with downloads for every platform and your account settings. In a browser, signing in to
@@ -120,6 +154,8 @@ signed in. If a request pops up that you didn't start, tap **Deny**.
 | An app still shows its login screen | Make sure the app is updated (single sign-on needs a recent version), then switch away from it and back |
 | "Sign in with Quarc Store" does nothing | Update Quarc Store |
 | Windows: "Install failed" | Check Tailscale and that GitHub is reachable, then try again. |
+| Mac: the Store's window stays empty | Connect Tailscale, then close and reopen Quarc Store |
+| Mac: "Move Quarc Store to your Applications folder…" when updating | Quit it, drag it from the disk image to Applications, open it from there |
 | Install stuck on "Confirm…" | Look for Android's install dialog, or pull down the notification shade |
 | "Couldn't load the app list" | Check that Tailscale is connected |
 | Phone sign-in: nothing appears on the phone | Open Quarc Store on the phone (it checks while it's open) and make sure it's signed in to the same account |
