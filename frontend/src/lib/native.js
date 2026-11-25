@@ -1,20 +1,35 @@
 // Thin accessors for what Quarc Store can do natively on the device it runs on:
 //   Android: Capacitor plugins (see mobile/android/app/src/main/java/com/quarc/store/)
-//   Windows: Tauri commands (see desktop/src-tauri/src/main.rs)
+//   Windows and Mac: Tauri commands (see desktop/src-tauri/src/main.rs)
 // In a browser every one of these returns null, so callers can use optional
 // chaining instead of their own platform checks.
 
 /** The Android app (Capacitor). */
 export const isAndroid = () => !!window?.Capacitor?.isNativePlatform?.();
-/** The Windows app (Tauri). */
+/** The Windows or Mac app (Tauri). */
 export const isDesktop = () => !!(window?.__TAURI_INTERNALS__ || window?.__TAURI__);
 /** Either app: this device can install, update and open Quarc apps. */
 export const isNative = () => isAndroid() || isDesktop();
 
-/** Which build of each app this device installs: the key in a release's `assets`. */
-export const installPlatform = () => (isDesktop() ? 'windows' : 'android');
+// What the desktop app runs on, set by the app before the page loads: { os: 'windows' | 'macos', arch: 'arm64' | 'x64' }
+// (desktop/src-tauri/src/main.rs). Windows Stores from before it existed don't set it.
+const desktopPlatform = () => window?.__QUARC_DESKTOP__ ?? null;
 
-/** The file this device installs from a release (the APK, or the Windows installer). */
+/** The Mac app. */
+export const isMac = () =>
+  isDesktop() && (desktopPlatform() ? desktopPlatform().os === 'macos' : /Mac/i.test(navigator.platform || ''));
+
+/** This device's Store is also its Quarc login for the other apps (Android and Windows; not on a Mac yet). */
+export const hasSso = () => isAndroid() || (isDesktop() && !isMac());
+
+/** Which build of each app this device installs: the key in a release's `assets`. */
+export const installPlatform = () => {
+  if (!isDesktop()) return 'android';
+  if (isMac()) return desktopPlatform()?.arch === 'x64' ? 'macos-intel' : 'macos-arm';
+  return 'windows';
+};
+
+/** The file this device installs from a release (the APK, the Windows installer, or the Mac disk image). */
 export const platformAsset = (release) => release?.assets?.[installPlatform()] ?? null;
 
 const plugin = (name) => (isAndroid() ? window.Capacitor.Plugins?.[name] ?? null : null);
@@ -23,7 +38,7 @@ const tauri = () => window.__TAURI__;
 const invoke = (command, args) => tauri().core.invoke(command, args);
 const reject = () => Promise.reject(new Error('Not available on this device'));
 
-// The Windows app, shaped like the Android "QuarcStore" plugin so the pages and stores don't
+// The Windows and Mac app, shaped like the Android "QuarcStore" plugin so the pages and stores don't
 // care which one they are talking to. Android-only features are rejected or ignored.
 const desktopStore = {
   getInstalled: ({ packages }) => invoke('get_installed', { packages }),
@@ -33,7 +48,7 @@ const desktopStore = {
   launch: ({ packageName }) => invoke('launch', { packageName }),
   openUrl: ({ url }) => invoke('open_url', { url }),
   deviceInfo: () => invoke('device_info'),
-  // Windows needs no install permission.
+  // Windows and Mac need no install permission.
   canInstall: () => Promise.resolve({ allowed: true }),
   openInstallSettings: () => Promise.resolve(),
   // Progress events from the installer: resolves to a handle with remove().
@@ -59,8 +74,8 @@ const desktopSsoHost = {
   listClients: () => invoke('sso_list_clients'),
 };
 
-/** The device-wide login other Quarc apps receive. */
-export const ssoHost = () => (isDesktop() ? desktopSsoHost : plugin('QuarcSsoHost'));
+/** The device-wide login other Quarc apps receive (none on a Mac). */
+export const ssoHost = () => (isDesktop() ? (isMac() ? null : desktopSsoHost) : plugin('QuarcSsoHost'));
 /** @capacitor/app — deep links and resume events (Android only). */
 export const appPlugin = () => plugin('App');
 
@@ -79,7 +94,7 @@ export function desktopDeepLinks(onUrl) {
   return () => removeListener(handle);
 }
 
-/** Opens a URL outside the app (system browser on Android and Windows, new tab on the web). */
+/** Opens a URL outside the app (system browser on Android, Windows and Mac; new tab on the web). */
 export function openExternal(url) {
   if (!url) return;
   const native = storeNative();

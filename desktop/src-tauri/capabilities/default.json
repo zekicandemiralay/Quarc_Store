@@ -1,6 +1,21 @@
 {
   "identifier": "default",
-  "description": "The Store window. Its pages are bundled in the app (not loaded from a server), and the only things they can ask for are the app's own commands in src/main.rs (install, update, open and remove Quarc apps) plus Tauri's events.",
+  "description": "The Store window with its pages bundled in the app (Windows). They may call the app's own commands in src/main.rs (install, update, open and remove Quarc apps; single sign-on) plus Tauri's events.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "allow-get-installed",
+    "allow-install",
+    "allow-cancel-install",
+    "allow-uninstall",
+    "allow-launch",
+    "allow-open-url",
+    "allow-device-info",
+    "allow-sso-sync-session",
+    "allow-sso-sign-out",
+    "allow-sso-get-state",
+    "allow-sso-list-clients",
+    "allow-take-launch-url",
+    "allow-debug-self-update"
+  ]
 }

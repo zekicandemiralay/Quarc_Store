@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Quarc Store — Mac app test</title>
+</head>
+<body style="font: 14px system-ui; background: #09090b; color: #eee">
+  <h1>Quarc Store — Mac app test</h1>
+  <pre id="log"></pre>
+  <script>
+    // Loaded by the real Store app (built with ci/harness.conf.json) from ci/serve.mjs, like the real Store page
+    // is loaded from the Quarc server: a page from a server, calling the app's commands. Reports every check to
+    // the server, which prints them and fails the CI step if any is wrong. See ci/run-harness.sh.
+    const results = [];
+    const say = (line) => {
+      document.getElementById('log').textContent += line + '\n';
+      fetch('/log', { method: 'POST', body: line }).catch(() => {});
+    };
+    const check = (name, ok, detail = '') => {
+      results.push({ name, ok: !!ok, detail: ok ? '' : String(detail) });
+      say(`${ok ? 'ok  ' : 'FAIL'} ${name}${ok ? '' : '  <<< ' + detail}`);
+    };
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    async function main() {
+      const params = await (await fetch('/params')).json();
+      const tauri = window.__TAURI__;
+      check('the app injected its API into the page', !!tauri?.core?.invoke, typeof tauri);
+      const invoke = (cmd, args) => tauri.core.invoke(cmd, args);
+
+      const platform = window.__QUARC_DESKTOP__;
+      check('the page knows it runs in the Mac Store', platform?.os === 'macos', JSON.stringify(platform));
+      check('…and on which processor', platform?.arch === params.arch, JSON.stringify(platform));
+      let frozen = true;
+      try { window.__QUARC_DESKTOP__ = { os: 'windows' }; frozen = window.__QUARC_DESKTOP__?.os === 'macos'; } catch { frozen = true; }
+      check('…and the page cannot change that', frozen);
+
+      const info = await invoke('device_info').catch((e) => ({ error: String(e) }));
+      check('device_info names this Mac', / \(Mac\)$|^Mac$/.test(info.model || ''), JSON.stringify(info));
+      check('device_info says macos', info.os === 'macos' && info.arch === params.arch, JSON.stringify(info));
+
+      const pkgs = ['com.quarc.notes', 'com.quarc.store'];
+      let installed = await invoke('get_installed', { packages: pkgs }).catch((e) => ({ error: String(e) }));
+      check('get_installed answers', !!installed.apps, JSON.stringify(installed));
+      check('Notes is not installed yet', installed.apps?.['com.quarc.notes']?.installed === false, JSON.stringify(installed));
+      check('the Store counts itself as installed, with its version',
+        installed.apps?.['com.quarc.store']?.installed === true && installed.apps['com.quarc.store'].versionName === params.storeVersion,
+        JSON.stringify(installed.apps?.['com.quarc.store']));
+
+      // Refused before anything is downloaded.
+      const refused = async (url, packageName) => invoke('install', { url, packageName }).then(() => 'accepted', (e) => String(e));
+      const evil = await refused('https://evil.example/Quarc.Notes_1.0.0_aarch64.dmg', 'com.quarc.notes');
+      check('an install from anywhere but GitHub is refused', /GitHub/.test(evil), evil);
+      const windowsFile = await refused(params.dmg.replace(/_(aarch64|x64)\.dmg$/, '_x64-setup.exe'), 'com.quarc.notes');
+      check('a Windows installer is refused on a Mac', /no Mac disk image/.test(windowsFile), windowsFile);
+      const wrongRepo = await refused(params.dmg, 'com.quarc.music');
+      check("another app's release is refused", /not a Quarc release/.test(wrongRepo), wrongRepo);
+
+      // A real install, as the Store page does it.
+      const phases = [];
+      let finished = null;
+      const unlisten = await tauri.event.listen('installProgress', (e) => {
+        const p = e.payload;
+        if (p.packageName !== 'com.quarc.notes') return;
+        if (!phases.includes(p.phase)) phases.push(p.phase);
+        if (['done', 'failed', 'cancelled'].includes(p.phase)) finished = p;
+      });
+      const started = await invoke('install', { url: params.dmg, packageName: 'com.quarc.notes' }).then(() => 'ok', (e) => String(e));
+      check('install starts', started === 'ok', started);
+      for (let i = 0; i < 600 && !finished; i++) await sleep(250);
+      check('install finishes with "done"', finished?.phase === 'done', JSON.stringify(finished));
+      check('progress went downloading → installing → done',
+        phases.join(',') === 'downloading,installing,done', phases.join(','));
+
+      installed = await invoke('get_installed', { packages: pkgs });
+      const notes = installed.apps['com.quarc.notes'];
+      check('Notes now shows as installed, with the release version',
+        notes?.installed === true && notes.versionName === params.version, JSON.stringify(notes));
+
+      const opened = await invoke('launch', { packageName: 'com.quarc.notes' }).then(() => 'ok', (e) => String(e));
+      check('launch opens Notes', opened === 'ok', opened);
+      await sleep(4000);
+      const runningNow = await fetch('/running?bundle=' + encodeURIComponent(params.notesPath)).then((r) => r.json());
+      check('…and Notes is running', runningNow.pids.length > 0, JSON.stringify(runningNow));
+
+      const gone = await invoke('uninstall', { packageName: 'com.quarc.notes' }).then(() => 'ok', (e) => String(e));
+      check('uninstall removes Notes (closing it first)', gone === 'ok', gone);
+      installed = await invoke('get_installed', { packages: pkgs });
+      check('Notes no longer shows as installed', installed.apps['com.quarc.notes']?.installed === false, JSON.stringify(installed.apps['com.quarc.notes']));
+      const runningAfter = await fetch('/running?bundle=' + encodeURIComponent(params.notesPath)).then((r) => r.json());
+      check('…and it is no longer running', runningAfter.pids.length === 0, JSON.stringify(runningAfter));
+
+      const self = await invoke('uninstall', { packageName: 'com.quarc.store' }).then(() => 'ok', (e) => String(e));
+      check('the Store will not remove itself', /can't remove itself/.test(self), self);
+
+      // A command the Mac page is not given (single sign-on stays Windows-only for now).
+      const sso = await invoke('sso_get_state').then(() => 'allowed', (e) => String(e));
+      check('single sign-on commands are not open to the Mac page', sso !== 'allowed', sso);
+      unlisten();
+    }
+
+    main()
+      .catch((e) => check('the test page ran to the end', false, e && (e.stack || e)))
+      .finally(() => fetch('/result', { method: 'POST', body: JSON.stringify(results) }));
+  </script>
+</body>
+</html>

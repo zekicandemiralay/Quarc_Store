@@ -1,4 +1,5 @@
-//! Which Quarc apps are installed on this PC, read from Windows' list of installed programs.
+//! Which Quarc apps are installed on this computer. On a Mac: the Quarc apps in the Applications folders
+//! (mac.rs). On Windows: read from Windows' list of installed programs, as follows.
 //!
 //! Every Quarc desktop app is installed by a Tauri (NSIS) installer, which registers the app under
 //! `...\Uninstall\<product name>` with the publisher "Quarc", its version, its folder and the file it
@@ -10,15 +11,18 @@ use crate::rules;
 
 #[derive(Clone, Debug)]
 pub struct Entry {
+    /// "com.quarc.music" where the computer records it (a Mac app's identifier); None on Windows.
+    pub id: Option<String>,
     /// "Quarc Music"
     pub display_name: String,
     /// "1.0.84"
     pub version: String,
-    /// Folder the app is installed in.
+    /// Folder the app is installed in (on a Mac: the .app itself).
     pub dir: Option<PathBuf>,
     /// "quarc-music.exe"
     pub main_binary: Option<String>,
     /// The app's own uninstall.exe (only ever a file called uninstall.exe).
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
     pub uninstall: Option<PathBuf>,
 }
 
@@ -52,6 +56,7 @@ pub fn entries() -> Vec<Entry> {
                 .map(|v| PathBuf::from(rules::unquote(&v)))
                 .filter(|p| p.file_name().is_some_and(|f| f.eq_ignore_ascii_case("uninstall.exe")));
             found.push(Entry {
+                id: None,
                 display_name: text("DisplayName").unwrap_or(name),
                 version: text("DisplayVersion").unwrap_or_default(),
                 dir: dir.or_else(|| uninstall.as_ref().and_then(|u| u.parent().map(PathBuf::from))),
@@ -63,22 +68,41 @@ pub fn entries() -> Vec<Entry> {
     found
 }
 
-/// Not Windows: nothing is installed through this app. (Keeps the crate buildable for development elsewhere.)
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+pub fn entries() -> Vec<Entry> {
+    crate::mac::scan(&crate::mac::apps_dirs())
+        .into_iter()
+        .map(|b| Entry {
+            id: Some(b.id),
+            display_name: b.name,
+            version: b.version,
+            dir: Some(b.path),
+            main_binary: b.executable,
+            uninstall: None,
+        })
+        .collect()
+}
+
+/// Neither Windows nor a Mac: nothing is installed through this app. (Keeps the crate buildable elsewhere.)
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn entries() -> Vec<Entry> {
     Vec::new()
 }
 
-/// `com.quarc.music` is "quarc-music.exe" / "Quarc Music".
+/// `com.quarc.music` is the Mac app with that identifier, or on Windows "quarc-music.exe" / "Quarc Music".
 pub fn find_in(entries: &[Entry], package: &str) -> Option<Entry> {
     let suffix = rules::package_suffix(package)?;
+    if let Some(entry) = entries.iter().find(|e| e.id.as_deref() == Some(package)) {
+        return Some(entry.clone());
+    }
     let binary = format!("quarc-{suffix}.exe");
     let name = format!("quarc {suffix}");
     entries
         .iter()
         .find(|e| {
-            e.main_binary.as_deref().is_some_and(|b| b.eq_ignore_ascii_case(&binary))
-                || e.display_name.eq_ignore_ascii_case(&name)
+            e.id.is_none()
+                && (e.main_binary.as_deref().is_some_and(|b| b.eq_ignore_ascii_case(&binary))
+                    || e.display_name.eq_ignore_ascii_case(&name))
         })
         .cloned()
 }
@@ -93,6 +117,7 @@ mod tests {
 
     fn entry(name: &str, binary: Option<&str>) -> Entry {
         Entry {
+            id: None,
             display_name: name.into(),
             version: "1.0.0".into(),
             dir: None,
@@ -108,5 +133,17 @@ mod tests {
         assert_eq!(find_in(&all, "com.quarc.notes").unwrap().display_name, "Quarc Notes");
         assert!(find_in(&all, "com.quarc.reader").is_none());
         assert!(find_in(&all, "com.evil.music").is_none());
+    }
+
+    #[test]
+    fn a_mac_app_is_found_by_its_identifier_only() {
+        let mut notes = entry("Quarc Notes", Some("quarc-notes"));
+        notes.id = Some("com.quarc.notes".into());
+        let mut impostor = entry("Quarc Music", Some("quarc-music.exe"));
+        impostor.id = Some("com.example.music".into());
+        let all = vec![impostor, notes];
+        assert_eq!(find_in(&all, "com.quarc.notes").unwrap().display_name, "Quarc Notes");
+        // Named like Quarc Music, but its identifier says it is something else.
+        assert!(find_in(&all, "com.quarc.music").is_none());
     }
 }

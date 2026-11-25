@@ -5,7 +5,7 @@ import { LogOut, Smartphone, Monitor, KeyRound, ShieldCheck, X, Bell, Languages 
 import useAuthStore from '../store/authStore';
 import useCatalogStore from '../store/catalogStore';
 import { api } from '../lib/api';
-import { isDesktop, isNative, ssoHost, storeNative } from '../lib/native';
+import { hasSso, isDesktop, isNative, ssoHost, storeNative } from '../lib/native';
 import { timeAgo } from '../lib/format';
 import { toast } from '../store/toastStore';
 import LoginForm from '../components/LoginForm';
@@ -18,6 +18,7 @@ function useAppName() {
     (client) => {
       if (client === 'quarc-store') return 'Quarc Store (Android)';
       if (client === 'quarc-store-windows') return 'Quarc Store (Windows)';
+      if (client === 'quarc-store-macos') return 'Quarc Store (Mac)';
       const app = apps.find((a) => a.packageName === client);
       return app ? app.name : client;
     },
@@ -111,7 +112,7 @@ function Sessions() {
       <div className="card divide-y divide-zinc-800">
         {roots.map((s) => {
           const kids = childrenOf(s.id);
-          const mobile = !/windows/i.test(`${s.client} ${s.device}`) && (/android|quarc-store|iphone|ipad/i.test(`${s.client} ${s.device}`) || kids.length > 0);
+          const mobile = !/windows|macos|\(mac\)/i.test(`${s.client} ${s.device}`) && (/android|quarc-store|iphone|ipad/i.test(`${s.client} ${s.device}`) || kids.length > 0);
           return (
             <div key={s.id} className="p-3.5">
               <div className="flex items-start gap-3">
@@ -288,8 +289,10 @@ export default function Account() {
   const logout = useAuthStore((s) => s.logout);
   const [params, setParams] = useSearchParams();
   const [confirmOut, setConfirmOut] = useState(false);
-  // Single sign-on: Android and Windows. ("This device" is the phone or the PC.)
+  // Back to the app that sent us here: Android, Windows and Mac. Single sign-on: Android and Windows only.
+  // ("This device" is the phone or the PC.)
   const native = isNative();
+  const sso = hasSso();
   const returnTo = params.get('return');
 
   // Arrived from another app ("Sign in with Quarc Store") while already signed in: go straight back.
@@ -326,7 +329,7 @@ export default function Account() {
         </div>
       </div>
 
-      {native && <DeviceSso />}
+      {sso && <DeviceSso />}
 
       <section>
         <h2 className="section-title">{t('account.sessions', 'Where you are signed in')}</h2>
@@ -343,7 +346,7 @@ export default function Account() {
         <Settings />
       </section>
 
-      <button className="btn-danger w-full rounded-xl py-3" onClick={() => (native ? setConfirmOut(true) : logout())}>
+      <button className="btn-danger w-full rounded-xl py-3" onClick={() => (sso ? setConfirmOut(true) : logout())}>
         <LogOut size={16} /> {t('auth.signOut', 'Sign out')}
       </button>
 

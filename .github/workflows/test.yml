@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
 
 jobs:
@@ -50,3 +50,61 @@ jobs:
       - name: Windows Store app — install rules, registry lookup
         working-directory: desktop/src-tauri
         run: cargo test
+
+  desktop-macos:
+    # The Mac Store app, on a real Mac: unit tests; a real Quarc app installed from its .dmg, opened, updated
+    # while open and removed; the Store's own .dmg built (ad-hoc signed) and the Store replacing itself from it;
+    # then the built app with a test page calling its commands the way the real Store page does (desktop/ci/).
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build the Store pages (the desktop app embeds them at compile time)
+        working-directory: frontend
+        run: npm install && npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Mac Store app — unit tests
+        working-directory: desktop/src-tauri
+        run: cargo test
+
+      - name: A real Quarc app — install from its .dmg, open, update while open, remove
+        working-directory: desktop/src-tauri
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/zekicandemiralay/Quarc_Notes/releases/latest \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).assets.find(a=>a.name.endsWith("_aarch64.dmg")).browser_download_url))')
+          curl -fsSL -o "$RUNNER_TEMP/notes.dmg" "$URL"
+          QUARC_TEST_DMG="$RUNNER_TEMP/notes.dmg" cargo test installs_opens_updates_and_removes_a_real_app -- --include-ignored --nocapture
+
+      - name: Build the Store app and its .dmg (ad-hoc signed)
+        working-directory: desktop
+        run: |
+          npm install
+          npx tauri build --bundles app,dmg
+          APP="src-tauri/target/release/bundle/macos/Quarc Store.app"
+          codesign -dv "$APP" 2>&1 | tee "$RUNNER_TEMP/codesign.txt"
+          grep -q "Signature=adhoc" "$RUNNER_TEMP/codesign.txt"
+          codesign --verify --deep --strict "$APP"
+          plutil -p "$APP/Contents/Info.plist" | grep -E "CFBundleIdentifier|CFBundleShortVersionString"
+          ls -l src-tauri/target/release/bundle/dmg/
+
+      - name: The Store replaces itself from its .dmg and opens the new copy
+        working-directory: desktop/src-tauri
+        run: |
+          DMG=$(ls target/release/bundle/dmg/*.dmg | head -1)
+          QUARC_TEST_STORE_DMG="$PWD/$DMG" cargo test the_store_replaces_itself -- --include-ignored --nocapture
+
+      - name: The built app with a test page — install, open, remove a real app; what must be refused
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash ci/run-harness.sh

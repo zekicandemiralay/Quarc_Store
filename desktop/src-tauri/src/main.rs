@@ -1,12 +1,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! Quarc Store for Windows.
+//! Quarc Store for Windows and Mac.
 //!
-//! The window shows the same Store pages as the Android app, bundled into this program. What the
-//! Android Store does through its native plugin (what is installed, install, update, open, remove)
-//! is done here by the commands below, which the page reaches through `frontend/src/lib/native.js`.
+//! The window shows the same Store pages as the Android app: on Windows bundled into this program, on a
+//! Mac loaded from the Quarc server (tauri.macos.conf.json; a Mac's web view would not send the server's
+//! login cookie to pages bundled into the app). What the Android Store does through its native plugin
+//! (what is installed, install, update, open, remove) is done here by the commands below, which the page
+//! reaches through `frontend/src/lib/native.js`.
 
 mod installer;
+// The Mac side of installing, opening and removing apps. Built everywhere (its pure parts are tested on
+// every platform); only used on a Mac.
+mod mac;
 // Single sign-on: the files the Store and the apps share. One copy, used here and carried by every app.
 #[path = "../../../sso-kit/desktop/quarc_sso_shared.rs"]
 mod quarc_sso_shared;
@@ -42,7 +47,9 @@ fn get_installed(app: AppHandle, packages: Vec<String>) -> Value {
         if rules::package_suffix(&package).is_none() {
             continue;
         }
-        let info = match registry::find_in(&entries, &package) {
+        // On a Mac the Store is the copy that is running, wherever it was opened from.
+        let running_self = package == rules::SELF_PACKAGE && cfg!(target_os = "macos");
+        let info = match registry::find_in(&entries, &package).filter(|_| !running_self) {
             Some(entry) => json!({
                 "installed": true,
                 "versionName": entry.version,
@@ -74,7 +81,7 @@ fn install(
     package_name: String,
 ) -> Result<(), String> {
     let suffix = rules::package_suffix(&package_name).ok_or("That is not a Quarc app")?;
-    let (url, file) = rules::installer_url(&url, suffix)?;
+    let (url, file) = rules::installer_url(&url, suffix, rules::Kind::here())?;
 
     let cancel = Arc::new(AtomicBool::new(false));
     {
@@ -117,10 +124,47 @@ async fn debug_self_update(app: AppHandle, path: String) -> Result<(), String> {
     installer::debug_self_update(&app, &path).await
 }
 
-/// A name for this PC in the "Where you are signed in" list.
+/// A name for this computer in the "Where you are signed in" list, and what it is.
 #[tauri::command]
 fn device_info() -> Value {
-    json!({ "model": sso::device_label() })
+    json!({ "model": sso::device_label(), "os": desktop_os(), "arch": desktop_arch() })
+}
+
+/// "windows" | "macos": which Store this is. The page reads it (with the processor) to pick which file of a
+/// release this computer installs.
+fn desktop_os() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(windows) {
+        "windows"
+    } else {
+        "linux"
+    }
+}
+
+/// "arm64" | "x64": the processor (on a Mac, Apple silicon even when this program runs translated).
+fn desktop_arch() -> &'static str {
+    #[cfg(target_os = "macos")]
+    {
+        mac::hardware_arch()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        if cfg!(target_arch = "aarch64") {
+            "arm64"
+        } else {
+            "x64"
+        }
+    }
+}
+
+/// Runs in the page before its own scripts, on every load (the Mac Store's page comes from the server):
+/// `window.__QUARC_DESKTOP__ = { os, arch }`, so the page knows at once which release file to install.
+fn platform_script() -> String {
+    format!(
+        "Object.defineProperty(window, '__QUARC_DESKTOP__', {{ value: Object.freeze({}), configurable: false }});",
+        json!({ "os": desktop_os(), "arch": desktop_arch() })
+    )
 }
 
 // ── Single sign-on: the Store as this PC's Quarc login (see sso.rs) ──────────────────────────────
@@ -165,6 +209,11 @@ fn main() {
                 let _ = window.set_focus();
             }
         }))
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry, ()>::new("quarc-desktop")
+                .js_init_script(platform_script())
+                .build(),
+        )
         .manage(installer::Tasks::default())
         .manage(LaunchUrl::default())
         .setup(|app| {
@@ -232,5 +281,14 @@ mod tests {
         assert_eq!(launch_url_in(args(&["quarc-store.exe", "https://evil.example"])), None);
         assert_eq!(launch_url_in(args(&["quarc-store.exe", "quarcstore://app/x y"])), None);
         assert_eq!(launch_url_in(args(&["quarc-store.exe", "quarcstore://login?return=a\"b"])), None);
+    }
+
+    #[test]
+    fn tells_the_page_what_it_runs_on() {
+        let script = platform_script();
+        assert!(script.starts_with("Object.defineProperty(window, '__QUARC_DESKTOP__'"), "{script}");
+        assert!(script.contains(&format!("\"os\":\"{}\"", desktop_os())), "{script}");
+        assert!(["arm64", "x64"].contains(&desktop_arch()));
+        assert_eq!(desktop_os() == "macos", cfg!(target_os = "macos"));
     }
 }

@@ -29,7 +29,17 @@ fn lock() -> &'static Mutex<()> {
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
+/// A name for this computer in the "Where you are signed in" list.
+#[cfg(target_os = "macos")]
+pub fn device_label() -> String {
+    match crate::mac::computer_name() {
+        Some(name) => format!("{name} (Mac)"),
+        None => "Mac".to_string(),
+    }
+}
+
 /// A name for this PC in the "Where you are signed in" list.
+#[cfg(not(target_os = "macos"))]
 pub fn device_label() -> String {
     let name = std::env::var("COMPUTERNAME").unwrap_or_default();
     if name.is_empty() {

@@ -7,7 +7,7 @@ import useAuthStore from '../store/authStore';
 import AppIcon from '../components/AppIcon';
 import AppActionButton from '../components/AppActionButton';
 import PlatformBadges from '../components/PlatformBadges';
-import { isDesktop, isNative } from '../lib/native';
+import { hasSso, isDesktop, isNative } from '../lib/native';
 
 function AppRow({ app }) {
   const { t } = useTranslation();
@@ -71,7 +71,7 @@ export default function Apps() {
 
   return (
     <div className="space-y-6">
-      {native && !user && (
+      {hasSso() && !user && (
         <Link to="/account" className="card flex items-center gap-3 border-accent/30 bg-accent-soft p-4">
           <KeyRound className="shrink-0 text-accent" size={22} />
           <div className="flex-1">

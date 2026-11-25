@@ -5,7 +5,7 @@ import { ArrowLeft, KeyRound, Github, Globe, Trash2, Download, ChevronDown } fro
 import useCatalogStore from '../store/catalogStore';
 import useDeviceStore, { useAppStatus, isRequired } from '../store/deviceStore';
 import { api } from '../lib/api';
-import { isDesktop, isNative, openExternal, platformAsset } from '../lib/native';
+import { isDesktop, isMac, isNative, openExternal, platformAsset } from '../lib/native';
 import { formatBytes, formatDate } from '../lib/format';
 import AppIcon from '../components/AppIcon';
 import AppActionButton from '../components/AppActionButton';
@@ -101,7 +101,7 @@ export default function AppDetail() {
 
   const latest = app.latest;
   const installAsset = platformAsset(latest);
-  // The Windows Store can update itself, but not remove itself.
+  // The Windows and Mac Store can update itself, but not remove itself.
   const isSelfOnDesktop = isDesktop() && app.packageName === 'com.quarc.store';
 
   return (
@@ -158,7 +158,7 @@ export default function AppDetail() {
         </div>
       )}
 
-      {app.sso && (
+      {app.sso && !isMac() && (
         <div className="flex gap-2.5 rounded-xl border border-accent/30 bg-accent-soft p-3 text-sm text-emerald-200">
           <KeyRound size={18} className="mt-0.5 shrink-0 text-accent" />
           <p>

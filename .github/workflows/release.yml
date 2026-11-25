@@ -1,9 +1,9 @@
 name: Release
 
-# Push a tag like v1.1.0 to build the signed Quarc Store APK (Android) and the
-# Windows installer, and publish both as one GitHub release. The Store lists
-# itself in its own catalog, so every installed Store (Android and Windows)
-# sees the new version and can update itself.
+# Push a tag like v1.1.0 to build the signed Quarc Store APK (Android), the
+# Windows installer and the Mac disk images, and publish them as one GitHub
+# release. The Store lists itself in its own catalog, so every installed Store
+# (Android, Windows and Mac) sees the new version and can update itself.
 
 on:
   push:
@@ -33,9 +33,12 @@ jobs:
               '|----------|------|',
               '| Android  | `Quarc-Store-Android.apk` |',
               '| Windows  | `Quarc.Store_*_x64-setup.exe` |',
+              '| Mac (Apple silicon: M1 and later) | `Quarc.Store_*_aarch64.dmg` |',
+              '| Mac (Intel) | `Quarc.Store_*_x64.dmg` |',
               '',
               '**Android:** download the APK, allow your browser/file manager to install apps, and open it.',
               '**Windows:** run the installer. If Windows says "protected your PC", choose More info → Run anyway (the Quarc apps are not signed with a paid certificate).',
+              '**Mac:** open the .dmg and drag Quarc Store to Applications, then open it from Applications. The first time, the Mac says it can\'t check the app (it is not signed with a paid Apple certificate): click Done, open System Settings → Privacy & Security, scroll down and click Open Anyway. Apps installed by Quarc Store open without that question.',
               'Already have Quarc Store? It will offer this update by itself.',
               '',
               'Tailscale must be connected — see README_Users.md.',
@@ -99,6 +102,69 @@ jobs:
         with:
           projectPath: desktop
           releaseId: ${{ needs.create-release.outputs.release_id }}
+
+  build-macos:
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Apple Silicon
+            rust-target: aarch64-apple-darwin
+          - label: Intel
+            rust-target: x86_64-apple-darwin
+    name: build-macos (${{ matrix.label }})
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # On a Mac the window loads the Store page from the server (tauri.macos.conf.json); the bundled pages
+      # are still built because Tauri needs them to compile.
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build the Store pages
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://quarcnet0.tail84500c.ts.net:4006
+        run: npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm install
+
+      - name: Set desktop version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: desktop/src-tauri
+        shell: bash
+        run: |
+          TAG=${GITHUB_REF#refs/tags/v}
+          node -e "const fs=require('fs'),c=JSON.parse(fs.readFileSync('tauri.conf.json','utf8'));c.version='${TAG}';fs.writeFileSync('tauri.conf.json',JSON.stringify(c,null,2)+'\n')"
+
+      - name: Build and upload the disk image (ad-hoc signed)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: --target ${{ matrix.rust-target }}
 
   build-android:
     needs: create-release
@@ -185,7 +251,7 @@ jobs:
             });
 
   publish-release:
-    needs: [create-release, build-windows, build-android]
+    needs: [create-release, build-windows, build-macos, build-android]
     permissions:
       contents: write
     runs-on: ubuntu-22.04

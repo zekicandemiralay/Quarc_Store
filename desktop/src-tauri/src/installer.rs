@@ -1,4 +1,5 @@
 //! Downloading and running a Quarc app's installer, starting an app, and removing one.
+//! (On a Mac the download is a disk image and the steps after it are in mac.rs.)
 //!
 //! The installers are the ones each app's release already ships (`...-setup.exe`, built by Tauri's
 //! NSIS bundler). They install for the current user, so no administrator prompt is needed; the Store
@@ -81,18 +82,62 @@ async fn flow(app: &AppHandle, package: &str, url: &Url, file: &str, cancel: &At
         return self_update(app, &path).await;
     }
 
-    let setup = path.clone();
-    let code = tauri::async_runtime::spawn_blocking(move || run_hidden(&setup, &["/S"]))
-        .await
-        .map_err(|e| e.to_string())??;
+    let result = install_downloaded(&path, package, &dir).await;
     let _ = tokio::fs::remove_dir_all(&dir).await;
-    if code != 0 {
-        return Err(format!("The installer stopped with code {code}"));
-    }
+    result?;
     if registry::find(package).is_none() {
         return Err("The installer finished, but the app does not show up as installed".into());
     }
     Ok(Outcome::Done)
+}
+
+/// Windows: runs the downloaded installer silently.
+#[cfg(not(target_os = "macos"))]
+async fn install_downloaded(setup: &Path, _package: &str, _work: &Path) -> Result<(), String> {
+    let setup = setup.to_path_buf();
+    let code = tauri::async_runtime::spawn_blocking(move || run_hidden(&setup, &["/S"]))
+        .await
+        .map_err(|e| e.to_string())??;
+    if code != 0 {
+        return Err(format!("The installer stopped with code {code}"));
+    }
+    Ok(())
+}
+
+/// Mac: copies the app out of the downloaded disk image into Applications (mac.rs).
+#[cfg(target_os = "macos")]
+async fn install_downloaded(dmg: &Path, package: &str, work: &Path) -> Result<(), String> {
+    let (dmg, package, work) = (dmg.to_path_buf(), package.to_string(), work.to_path_buf());
+    tauri::async_runtime::spawn_blocking(move || crate::mac::install(&dmg, &package, &crate::mac::apps_dirs(), &work))
+        .await
+        .map_err(|e| e.to_string())?
+        .map(|_| ())
+}
+
+/// Is the downloaded file what this computer installs from?
+fn check_download(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if crate::mac::is_dmg(path) {
+            Ok(())
+        } else {
+            Err("The downloaded file is not a Mac disk image".into())
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Every Windows program starts with "MZ"; anything else is not an installer.
+        let mut head = [0u8; 2];
+        let is_program = std::fs::File::open(path)
+            .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head))
+            .is_ok()
+            && &head == b"MZ";
+        if is_program {
+            Ok(())
+        } else {
+            Err("The downloaded file is not a Windows installer".into())
+        }
+    }
 }
 
 /// Downloads to `dest`. Returns false if it was cancelled.
@@ -156,19 +201,12 @@ async fn download(app: &AppHandle, package: &str, url: &Url, dest: &Path, cancel
     if total.is_some_and(|t| t != got) {
         return Err("The download was cut short".into());
     }
-    // Every Windows program starts with "MZ"; anything else is not an installer.
-    let mut head = [0u8; 2];
-    let is_program = std::fs::File::open(dest)
-        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head))
-        .is_ok()
-        && &head == b"MZ";
-    if !is_program {
-        return Err("The downloaded file is not a Windows installer".into());
-    }
+    check_download(dest)?;
     Ok(true)
 }
 
 /// Runs a program without a console window and waits for it. Returns its exit code.
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 fn run_hidden(program: &Path, args: &[&str]) -> Result<i32, String> {
     let mut command = Command::new(program);
     command.args(args);
@@ -187,6 +225,7 @@ fn hide_window(command: &mut Command) {
 }
 
 #[cfg(not(windows))]
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 fn hide_window(_command: &mut Command) {}
 
 /// The Store replacing itself: Windows cannot overwrite a running program, so a helper process
@@ -215,9 +254,23 @@ async fn self_update(app: &AppHandle, setup: &Path) -> Result<Outcome, String> {
     Ok(Outcome::Restarting)
 }
 
-#[cfg(not(windows))]
+/// The Store replacing itself on a Mac: the new copy is swapped in, then a helper opens it once this
+/// one has quit (mac.rs).
+#[cfg(target_os = "macos")]
+async fn self_update(app: &AppHandle, dmg: &Path) -> Result<Outcome, String> {
+    let dmg = dmg.to_path_buf();
+    let work = dmg.parent().map(Path::to_path_buf).unwrap_or_else(std::env::temp_dir);
+    tauri::async_runtime::spawn_blocking(move || crate::mac::self_update(&dmg, rules::SELF_PACKAGE, &work))
+        .await
+        .map_err(|e| e.to_string())??;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    app.exit(0);
+    Ok(Outcome::Restarting)
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 async fn self_update(_app: &AppHandle, _setup: &Path) -> Result<Outcome, String> {
-    Err("Updating the Store is only supported on Windows".into())
+    Err("Updating the Store is only supported on Windows and Mac".into())
 }
 
 /// Development builds only: the self-update path with a local installer, so it can be tried before
@@ -227,7 +280,16 @@ pub async fn debug_self_update(app: &AppHandle, setup: &str) -> Result<(), Strin
     self_update(app, Path::new(setup)).await.map(|_| ())
 }
 
+/// Starts an installed app (Mac: the way Finder does).
+#[cfg(target_os = "macos")]
+pub fn launch(package: &str) -> Result<(), String> {
+    let entry = registry::find(package).ok_or("That app is not installed")?;
+    let bundle = entry.dir.ok_or("Couldn't find where the app is installed")?;
+    crate::mac::open(&bundle)
+}
+
 /// Starts an installed app.
+#[cfg(not(target_os = "macos"))]
 pub fn launch(package: &str) -> Result<(), String> {
     let entry = registry::find(package).ok_or("That app is not installed")?;
     let dir = entry.dir.ok_or("Couldn't find where the app is installed")?;
@@ -251,10 +313,26 @@ fn detach(command: &mut Command) {
     command.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 fn detach(_command: &mut Command) {}
 
+/// Removes an app from Applications (closing it first). Like on Windows, its data and settings are kept.
+#[cfg(target_os = "macos")]
+pub async fn uninstall(package: &str) -> Result<(), String> {
+    if package == rules::SELF_PACKAGE {
+        return Err("Quarc Store can't remove itself from here. Drag it from Applications to the Bin.".into());
+    }
+    let package = package.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        let app = crate::mac::find(&crate::mac::apps_dirs(), &package).ok_or("That app is not installed")?;
+        crate::mac::remove(&app)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Removes an installed app with its own uninstaller (`/S`: silent; the app's data is kept).
+#[cfg(not(target_os = "macos"))]
 pub async fn uninstall(package: &str) -> Result<(), String> {
     if package == rules::SELF_PACKAGE {
         return Err("Quarc Store can't remove itself from here. Use Windows Settings > Apps.".into());
@@ -287,10 +365,17 @@ pub fn open_url(url: &str) -> Result<(), String> {
     if parsed.scheme() != "https" && parsed.scheme() != "http" {
         return Err("Only web addresses can be opened".into());
     }
-    let mut command = Command::new("rundll32");
-    // One argument, never run through a shell: a "&" in the address is just part of it.
-    command.arg("url.dll,FileProtocolHandler").arg(parsed.as_str());
-    hide_window(&mut command);
-    command.spawn().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    {
+        crate::mac::open_url(parsed.as_str())?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let mut command = Command::new("rundll32");
+        // One argument, never run through a shell: a "&" in the address is just part of it.
+        command.arg("url.dll,FileProtocolHandler").arg(parsed.as_str());
+        hide_window(&mut command);
+        command.spawn().map_err(|e| e.to_string())?;
+    }
     Ok(())
 }

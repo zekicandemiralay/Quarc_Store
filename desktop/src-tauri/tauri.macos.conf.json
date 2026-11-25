@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "macOS": {
+      "signingIdentity": "-"
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Quarc Store",
+        "url": "https://quarcnet0.tail84500c.ts.net:4006",
+        "width": 1000,
+        "height": 650,
+        "minWidth": 420,
+        "minHeight": 520,
+        "resizable": true,
+        "fullscreen": false,
+        "maximized": true,
+        "backgroundColor": "#09090b"
+      }
+    ]
+  }
+}

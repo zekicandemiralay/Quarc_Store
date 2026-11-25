@@ -1,0 +1,20 @@
+{
+  "identifier": "macos-server-page",
+  "description": "On a Mac the Store window shows the Store page from the Quarc server (tauri.macos.conf.json). That page, at that address only, may install, update, open and remove Quarc apps; what may be downloaded is still limited to this owner's Quarc releases on GitHub (src/rules.rs). No single sign-on on a Mac (yet).",
+  "platforms": ["macOS"],
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://quarcnet0.tail84500c.ts.net:4006/*"]
+  },
+  "permissions": [
+    "core:default",
+    "allow-get-installed",
+    "allow-install",
+    "allow-cancel-install",
+    "allow-uninstall",
+    "allow-launch",
+    "allow-open-url",
+    "allow-device-info",
+    "allow-take-launch-url"
+  ]
+}

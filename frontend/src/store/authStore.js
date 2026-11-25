@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api, apiUrl, API_BASE } from '../lib/api';
-import { isAndroid, isDesktop, ssoHost, storeNative } from '../lib/native';
+import { isAndroid, isDesktop, isMac, ssoHost, storeNative } from '../lib/native';
 
 // The Store's own login. On Android it is also *the device's* Quarc login (on Windows each app keeps its own):
 // after every successful login/session check the session is handed to the
@@ -46,9 +46,9 @@ async function loginBody(username, password) {
     const info = await storeNative()?.deviceInfo().catch(() => null);
     if (info?.model) body.device = info.model;
   } else if (isDesktop()) {
-    // A different label on purpose: only the phone's Store session may sign in other apps or
-    // approve a computer's sign-in. This one is just named in the "Where you are signed in" list.
-    body.client = 'quarc-store-windows';
+    // A different label on purpose: only the phone's Store session may approve a computer's sign-in,
+    // and the Mac's may not sign in other apps either. These are named in the "Where you are signed in" list.
+    body.client = isMac() ? 'quarc-store-macos' : 'quarc-store-windows';
     const info = await storeNative()?.deviceInfo().catch(() => null);
     if (info?.model) body.device = info.model;
   }
